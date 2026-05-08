@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "dragoncraft",
+  "version": "${version}",
+  "name": "DragonCraft Z",
+  "description": "Bring the Dragon Ball universe to Minecraft. Choose your race, awaken your Ki and ascend beyond your limits.",
+  "authors": ["Bernardo"],
+  "contact": {
+    "sources": "https://github.com/Broly199372/DragonCraft-Z"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.bernardo.dragoncraft.DragonCraftZ"],
+    "client": ["com.bernardo.dragoncraft.DragonCraftZClient"]
+  },
+  "mixins": ["dragoncraft.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-language-kotlin": ">=1.11.0+kotlin.2.0.0",
+    "fabric": "*",
+    "minecraft": "~1.20.1"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
