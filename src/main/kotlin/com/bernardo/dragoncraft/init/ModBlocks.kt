@@ -3,7 +3,7 @@ package com.bernardo.dragoncraft.init
 import com.bernardo.dragoncraft.DragonCraftZ
 import com.bernardo.dragoncraft.block.*
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents
-import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings
+import net.minecraft.block.AbstractBlock
 import net.minecraft.block.Block
 import net.minecraft.block.Blocks
 import net.minecraft.item.BlockItem
@@ -14,20 +14,18 @@ import net.minecraft.util.Identifier
 
 object ModBlocks {
 
-    val DIRTYSTONE_COBBLESTONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.COBBLESTONE))
-    val DIRTYSTONE_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
-    val DIRTYSTONE_STONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.STONE))
-
-    val NAMEK_GRASS = NamekGrassBlock(FabricBlockSettings.copyOf(Blocks.GRASS_BLOCK))
-    val NAMEK_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
-    val NAMEK_LOG = NamekLogBlock(FabricBlockSettings.copyOf(Blocks.OAK_LOG))
-    val NAMEK_LEAVES = NamekLeavesBlock(FabricBlockSettings.copyOf(Blocks.OAK_LEAVES))
-    val NAMEK_SAPLING = NamekSaplingBlock(FabricBlockSettings.copyOf(Blocks.OAK_SAPLING))
-
-    val LOOKOUT_FLOOR_RED = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_FLOOR_WHITE = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_WALL = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_YELLOW_BLOCK = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+    val DIRTYSTONE_COBBLESTONE = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.COBBLESTONE))
+    val DIRTYSTONE_DIRTY = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.DIRT))
+    val DIRTYSTONE_STONE = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.STONE))
+    val NAMEK_GRASS = NamekGrassBlock(AbstractBlock.Settings.copy(Blocks.GRASS_BLOCK))
+    val NAMEK_DIRTY = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.DIRT))
+    val NAMEK_LOG = NamekLogBlock(AbstractBlock.Settings.copy(Blocks.OAK_LOG))
+    val NAMEK_LEAVES = NamekLeavesBlock(AbstractBlock.Settings.copy(Blocks.OAK_LEAVES))
+    val NAMEK_SAPLING = NamekSaplingBlock(AbstractBlock.Settings.copy(Blocks.OAK_SAPLING))
+    val LOOKOUT_FLOOR_RED = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_FLOOR_WHITE = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_WALL = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_YELLOW_BLOCK = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
 
     fun register() {
         registerBlock("dirtystone_cobblestone", DIRTYSTONE_COBBLESTONE)

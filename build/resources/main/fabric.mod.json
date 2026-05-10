@@ -11,8 +11,18 @@
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
-    "main": ["com.bernardo.dragoncraft.DragonCraftZ"],
-    "client": ["com.bernardo.dragoncraft.DragonCraftZClient"]
+    "main": [
+      {
+        "adapter": "kotlin",
+        "value": "com.bernardo.dragoncraft.DragonCraftZ"
+      }
+    ],
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "com.bernardo.dragoncraft.DragonCraftZClient"
+      }
+    ]
   },
   "mixins": ["dragoncraft.mixins.json"],
   "depends": {
