@@ -1,1 +1,6 @@
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_dirty"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/dirtystone_dirty"
+  }
+}
