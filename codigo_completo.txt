@@ -1,0 +1,1507 @@
+==================================
+CÓDIGO DO MOD DRAGONCRAFT
+Data: Tue May 12 18:00:40 UTC 2026
+==================================
+
+========================================
+ESTRUTURA DE ARQUIVOS BINÁRIOS/RECURSOS
+========================================
+src/main/resources/assets/dragoncraft/textures/block/dirtystone_cobblestone.png
+src/main/resources/assets/dragoncraft/textures/block/dirtystone_dirty.png
+src/main/resources/assets/dragoncraft/textures/block/dirtystone_stone.png
+src/main/resources/assets/dragoncraft/textures/block/lookout_floor_red.png
+src/main/resources/assets/dragoncraft/textures/block/lookout_floor_white.png
+src/main/resources/assets/dragoncraft/textures/block/lookout_wall.png
+src/main/resources/assets/dragoncraft/textures/block/lookout_yellow_block.png
+src/main/resources/assets/dragoncraft/textures/block/namek_dirty.png
+src/main/resources/assets/dragoncraft/textures/block/namek_grass_side.png
+src/main/resources/assets/dragoncraft/textures/block/namek_grass_top.png
+src/main/resources/assets/dragoncraft/textures/block/namek_leave.png
+src/main/resources/assets/dragoncraft/textures/block/namek_log_side.png
+src/main/resources/assets/dragoncraft/textures/block/namek_log_top.png
+src/main/resources/assets/dragoncraft/textures/block/namek_sapling.png
+src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_armor_model.png
+src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_bot_model.png
+src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_leg_model.png
+src/main/resources/assets/dragoncraft/textures/entity/dino.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_goku_armor.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_goku_bot.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_goku_leg.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_vegeta_armor.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_vegeta_bot.png
+src/main/resources/assets/dragoncraft/textures/item/dbi_vegeta_leg.png
+src/main/resources/assets/dragoncraft/textures/item/dino_meat_cooked_raw.png
+src/main/resources/assets/dragoncraft/textures/item/dino_meat_cooked_raw_particule.png
+src/main/resources/assets/dragoncraft/textures/item/dino_meat_raw.png
+src/main/resources/assets/dragoncraft/textures/item/dino_meat_raw_particule.png
+src/main/resources/assets/dragoncraft/textures/item/senzu1.png
+src/main/resources/assets/dragoncraft/textures/item/senzu2.png
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/DragonCraftZ.kt
+========================================
+package com.bernardo.dragoncraft
+
+import com.bernardo.dragoncraft.init.ModBlocks
+import com.bernardo.dragoncraft.init.ModItems
+import com.bernardo.dragoncraft.init.ModEntities
+import com.bernardo.dragoncraft.init.ModSounds
+import com.bernardo.dragoncraft.network.ModNetwork
+import net.fabricmc.api.ModInitializer
+import org.slf4j.LoggerFactory
+
+object DragonCraftZ : ModInitializer {
+
+    const val MOD_ID = "dragoncraft"
+    val LOGGER = LoggerFactory.getLogger(MOD_ID)
+
+    override fun onInitialize() {
+        LOGGER.info("DragonCraft Z awakening... 🐉")
+
+        ModItems.register()
+        ModBlocks.register()
+        ModEntities.register()
+        ModSounds.register()
+        ModNetwork.register()
+
+        LOGGER.info("DragonCraft Z is ready. Power level: OVER 9000!")
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/DragonCraftZClient.kt
+========================================
+package com.bernardo.dragoncraft
+
+import net.fabricmc.api.ClientModInitializer
+
+object DragonCraftZClient : ClientModInitializer {
+
+    override fun onInitializeClient() {
+        DragonCraftZ.LOGGER.info("DragonCraft Z client initialized!")
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/DirtystoneBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.Block
+
+class DirtystoneBlock(settings: Settings) : Block(settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/LookoutBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.Block
+
+class LookoutBlock(settings: Settings) : Block(settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/NamekGrassBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.Block
+
+class NamekGrassBlock(settings: Settings) : Block(settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/NamekLeavesBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.LeavesBlock
+
+class NamekLeavesBlock(settings: Settings) : LeavesBlock(settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/NamekLogBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.PillarBlock
+
+class NamekLogBlock(settings: Settings) : PillarBlock(settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/NamekSaplingBlock.kt
+========================================
+package com.bernardo.dragoncraft.block
+
+import net.minecraft.block.SaplingBlock
+import net.minecraft.block.sapling.OakSaplingGenerator
+
+class NamekSaplingBlock(settings: Settings) : SaplingBlock(OakSaplingGenerator(), settings)
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/init/ModBlocks.kt
+========================================
+package com.bernardo.dragoncraft.init
+
+import com.bernardo.dragoncraft.DragonCraftZ
+import com.bernardo.dragoncraft.block.*
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents
+import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings
+import net.minecraft.block.Block
+import net.minecraft.block.Blocks
+import net.minecraft.item.BlockItem
+import net.minecraft.item.Item
+import net.minecraft.registry.Registries
+import net.minecraft.registry.Registry
+import net.minecraft.util.Identifier
+
+object ModBlocks {
+
+    val DIRTYSTONE_COBBLESTONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.COBBLESTONE))
+    val DIRTYSTONE_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
+    val DIRTYSTONE_STONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.STONE))
+
+    val NAMEK_GRASS = NamekGrassBlock(FabricBlockSettings.copyOf(Blocks.GRASS_BLOCK))
+    val NAMEK_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
+    val NAMEK_LOG = NamekLogBlock(FabricBlockSettings.copyOf(Blocks.OAK_LOG))
+    val NAMEK_LEAVES = NamekLeavesBlock(FabricBlockSettings.copyOf(Blocks.OAK_LEAVES))
+    val NAMEK_SAPLING = NamekSaplingBlock(FabricBlockSettings.copyOf(Blocks.OAK_SAPLING))
+
+    val LOOKOUT_FLOOR_RED = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+    val LOOKOUT_FLOOR_WHITE = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+    val LOOKOUT_WALL = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+    val LOOKOUT_YELLOW_BLOCK = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+
+    fun register() {
+        registerBlock("dirtystone_cobblestone", DIRTYSTONE_COBBLESTONE)
+        registerBlock("dirtystone_dirty", DIRTYSTONE_DIRTY)
+        registerBlock("dirtystone_stone", DIRTYSTONE_STONE)
+        registerBlock("namek_grass", NAMEK_GRASS)
+        registerBlock("namek_dirty", NAMEK_DIRTY)
+        registerBlock("namek_log", NAMEK_LOG)
+        registerBlock("namek_leaves", NAMEK_LEAVES)
+        registerBlock("namek_sapling", NAMEK_SAPLING)
+        registerBlock("lookout_floor_red", LOOKOUT_FLOOR_RED)
+        registerBlock("lookout_floor_white", LOOKOUT_FLOOR_WHITE)
+        registerBlock("lookout_wall", LOOKOUT_WALL)
+        registerBlock("lookout_yellow_block", LOOKOUT_YELLOW_BLOCK)
+
+        ItemGroupEvents.modifyEntriesEvent(ModItems.DRAGONCRAFT_GROUP).register { group ->
+            group.add(DIRTYSTONE_COBBLESTONE)
+            group.add(DIRTYSTONE_DIRTY)
+            group.add(DIRTYSTONE_STONE)
+            group.add(NAMEK_GRASS)
+            group.add(NAMEK_DIRTY)
+            group.add(NAMEK_LOG)
+            group.add(NAMEK_LEAVES)
+            group.add(NAMEK_SAPLING)
+            group.add(LOOKOUT_FLOOR_RED)
+            group.add(LOOKOUT_FLOOR_WHITE)
+            group.add(LOOKOUT_WALL)
+            group.add(LOOKOUT_YELLOW_BLOCK)
+        }
+    }
+
+    private fun registerBlock(name: String, block: Block) {
+        Registry.register(Registries.BLOCK, Identifier(DragonCraftZ.MOD_ID, name), block)
+        Registry.register(Registries.ITEM, Identifier(DragonCraftZ.MOD_ID, name), BlockItem(block, Item.Settings()))
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/init/ModEntities.kt
+========================================
+package com.bernardo.dragoncraft.init
+object ModEntities { fun register() {} }
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/init/ModItems.kt
+========================================
+package com.bernardo.dragoncraft.init
+
+import com.bernardo.dragoncraft.DragonCraftZ
+import com.bernardo.dragoncraft.item.DinoMeatRawItem
+import com.bernardo.dragoncraft.item.DinoMeatCookedItem
+import com.bernardo.dragoncraft.item.SenzuBeanItem
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents
+import net.minecraft.item.Item
+import net.minecraft.item.ItemGroup
+import net.minecraft.item.ItemStack
+import net.minecraft.registry.Registries
+import net.minecraft.registry.Registry
+import net.minecraft.registry.RegistryKey
+import net.minecraft.text.Text
+import net.minecraft.util.Identifier
+
+object ModItems {
+
+    val DINO_MEAT_RAW = DinoMeatRawItem()
+    val DINO_MEAT_COOKED = DinoMeatCookedItem()
+    val SENZU_BEAN = SenzuBeanItem()
+
+    val DRAGONCRAFT_GROUP: RegistryKey<ItemGroup> = RegistryKey.of(
+        Registries.ITEM_GROUP.key,
+        Identifier(DragonCraftZ.MOD_ID, "dragoncraft_group")
+    )
+
+    fun register() {
+        registerItem("dino_meat_raw", DINO_MEAT_RAW)
+        registerItem("dino_meat_cooked_raw", DINO_MEAT_COOKED)
+        registerItem("senzu_bean", SENZU_BEAN)
+
+        Registry.register(
+            Registries.ITEM_GROUP,
+            DRAGONCRAFT_GROUP,
+            FabricItemGroup.builder()
+                .displayName(Text.literal("DragonCraft Z"))
+                .icon { ItemStack(SENZU_BEAN) }
+                .build()
+        )
+
+        ItemGroupEvents.modifyEntriesEvent(DRAGONCRAFT_GROUP).register { group ->
+            group.add(DINO_MEAT_RAW)
+            group.add(DINO_MEAT_COOKED)
+            group.add(SENZU_BEAN)
+        }
+    }
+
+    private fun registerItem(name: String, item: Item) {
+        Registry.register(
+            Registries.ITEM,
+            Identifier(DragonCraftZ.MOD_ID, name),
+            item
+        )
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/init/ModSounds.kt
+========================================
+package com.bernardo.dragoncraft.init
+object ModSounds { fun register() {} }
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/item/DinoMeatCookedItem.kt
+========================================
+package com.bernardo.dragoncraft.item
+
+import net.minecraft.entity.LivingEntity
+import net.minecraft.entity.effect.StatusEffectInstance
+import net.minecraft.entity.effect.StatusEffects
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.item.FoodComponent
+import net.minecraft.item.ItemStack
+import net.minecraft.world.World
+
+class DinoMeatCookedItem : DragonCraftFoodItem(
+    Settings()
+        .food(
+            FoodComponent.Builder()
+                .hunger(8)
+                .saturationModifier(0.8f)
+                .meat()
+                .build()
+        )
+) {
+
+    override fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {
+        if (!world.isClient && user is PlayerEntity) {
+            user.addStatusEffect(
+                StatusEffectInstance(StatusEffects.STRENGTH, 400, 0)
+            )
+            user.addStatusEffect(
+                StatusEffectInstance(StatusEffects.SPEED, 200, 0)
+            )
+        }
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/item/DinoMeatRawItem.kt
+========================================
+package com.bernardo.dragoncraft.item
+
+import net.minecraft.entity.LivingEntity
+import net.minecraft.entity.effect.StatusEffectInstance
+import net.minecraft.entity.effect.StatusEffects
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.item.FoodComponent
+import net.minecraft.item.Item
+import net.minecraft.item.ItemStack
+import net.minecraft.world.World
+
+class DinoMeatRawItem : DragonCraftFoodItem(
+    Settings()
+        .food(
+            FoodComponent.Builder()
+                .hunger(3)
+                .saturationModifier(0.3f)
+                .meat()
+                .build()
+        )
+) {
+
+    override fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {
+        if (!world.isClient && user is PlayerEntity) {
+            user.addStatusEffect(
+                StatusEffectInstance(StatusEffects.HUNGER, 200, 0)
+            )
+            user.addStatusEffect(
+                StatusEffectInstance(StatusEffects.POISON, 100, 0)
+            )
+        }
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/item/DragonCraftFoodItem.kt
+========================================
+package com.bernardo.dragoncraft.item
+
+import net.minecraft.entity.LivingEntity
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.item.Item
+import net.minecraft.item.ItemStack
+import net.minecraft.world.World
+
+open class DragonCraftFoodItem(settings: Settings) : Item(settings) {
+
+    override fun finishUsing(stack: ItemStack, world: World, user: LivingEntity): ItemStack {
+        val result = super.finishUsing(stack, world, user)
+        onFoodEaten(stack, world, user)
+        return result
+    }
+
+    open fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {}
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/item/SenzuBeanItem.kt
+========================================
+package com.bernardo.dragoncraft.item
+
+import net.minecraft.client.item.TooltipContext
+import net.minecraft.entity.LivingEntity
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.item.FoodComponent
+import net.minecraft.item.ItemStack
+import net.minecraft.text.Text
+import net.minecraft.util.Hand
+import net.minecraft.util.TypedActionResult
+import net.minecraft.util.UseAction
+import net.minecraft.world.World
+
+class SenzuBeanItem : DragonCraftFoodItem(
+    Settings()
+        .food(
+            FoodComponent.Builder()
+                .hunger(20)
+                .saturationModifier(2.0f)
+                .alwaysEdible()
+                .build()
+        )
+        .maxCount(16)
+) {
+
+    override fun getUseAction(stack: ItemStack): UseAction {
+        return UseAction.EAT
+    }
+
+    override fun getMaxUseTime(stack: ItemStack): Int {
+        return 32
+    }
+
+    override fun use(world: World, user: PlayerEntity, hand: Hand): TypedActionResult<ItemStack> {
+        return TypedActionResult.consume(user.getStackInHand(hand))
+    }
+
+    override fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {
+        if (!world.isClient && user is PlayerEntity) {
+            user.health = user.maxHealth
+            user.clearStatusEffects()
+        }
+    }
+
+    override fun appendTooltip(
+        stack: ItemStack,
+        world: World?,
+        tooltip: MutableList<Text>,
+        context: TooltipContext
+    ) {
+        tooltip.add(Text.literal("§aRestores full health and hunger"))
+        tooltip.add(Text.literal("§7Clears all status effects"))
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/network/ModNetwork.kt
+========================================
+package com.bernardo.dragoncraft.network
+object ModNetwork { fun register() {} }
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/animations/dino1.animation.walk.json
+========================================
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation_dino_walk": {
+			"loop": true,
+			"animation_length": 0.875,
+			"bones": {
+				"body2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -5]
+						},
+						"0.6667": {
+							"vector": [0, 0, 5]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -2]
+						},
+						"0.6667": {
+							"vector": [0, 0, -2]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"head": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -5]
+						},
+						"0.6667": {
+							"vector": [0, 0, 5]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -2]
+						},
+						"0.6667": {
+							"vector": [0, 0, -2]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"rightArm": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -5]
+						},
+						"0.6667": {
+							"vector": [0, 0, 5]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -2]
+						},
+						"0.6667": {
+							"vector": [0, 0, -2]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"bone17": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [10, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, -1, -1]
+						}
+					}
+				},
+				"bone18": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [7.5, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, -2, -0.5]
+						}
+					}
+				},
+				"leftArm": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -5]
+						},
+						"0.6667": {
+							"vector": [0, 0, 5]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, -2]
+						},
+						"0.6667": {
+							"vector": [0, 0, -2]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"bone12": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [10, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, -1, -1]
+						}
+					}
+				},
+				"bone13": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [7.5, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, -2, -0.5]
+						}
+					}
+				},
+				"base": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-12.5, 0, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, 0]
+						},
+						"0.6667": {
+							"vector": [10, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 3, -2]
+						},
+						"0.5": {
+							"vector": [0, 0, -4]
+						},
+						"0.6667": {
+							"vector": [0, 0, 3]
+						}
+					}
+				},
+				"Canela": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-10, 0, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, 0]
+						},
+						"0.6667": {
+							"vector": [20, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 2, -1.5]
+						},
+						"0.5": {
+							"vector": [0, 0, -4.5]
+						},
+						"0.6667": {
+							"vector": [0, 0, 1.5]
+						}
+					}
+				},
+				"Joelho": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-12.5, 0, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-12.5, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 2, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, -4]
+						},
+						"0.6667": {
+							"vector": [0, 3, -1]
+						}
+					}
+				},
+				"Coxa": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-10, 0, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-17.5, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 2, 0]
+						},
+						"0.5": {
+							"vector": [0, 0, -4]
+						},
+						"0.6667": {
+							"vector": [0, 2, 1]
+						}
+					}
+				},
+				"base2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [10, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-12.5, 0, 0]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, 3]
+						},
+						"0.6667": {
+							"vector": [0, 3, -4]
+						},
+						"0.875": {
+							"vector": [0, 0, -4]
+						}
+					}
+				},
+				"canela2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [20, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-10, 0, 0]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 0, 1.5]
+						},
+						"0.6667": {
+							"vector": [0, 2, -3.5]
+						},
+						"0.875": {
+							"vector": [0, 0, -4.5]
+						}
+					}
+				},
+				"joelho2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [-12.5, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-12.5, 0, 0]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 3, -1]
+						},
+						"0.6667": {
+							"vector": [0, 2, -2]
+						},
+						"0.875": {
+							"vector": [0, 0, -4]
+						}
+					}
+				},
+				"coxa2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [-17.5, 0, 0]
+						},
+						"0.6667": {
+							"vector": [-10, 0, 0]
+						},
+						"0.875": {
+							"vector": [0, 0, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 2, 1]
+						},
+						"0.6667": {
+							"vector": [0, 2, -1]
+						},
+						"0.875": {
+							"vector": [0, 0, -4]
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_cobblestone.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/dirtystone_cobblestone"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_dirty.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/dirtystone_dirty"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_stone.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/dirtystone_stone"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_floor_red.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/lookout_floor_red"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_floor_white.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/lookout_floor_white"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_wall.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/lookout_wall"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_yellow_block.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/lookout_yellow_block"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_dirty.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/namek_dirty"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_grass.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/namek_grass"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_leaves.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/namek_leaves"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_log.json
+========================================
+{"variants":{"axis=y":{"model":"dragoncraft:block/namek_log"},"axis=x":{"model":"dragoncraft:block/namek_log","x":90,"y":90},"axis=z":{"model":"dragoncraft:block/namek_log","x":90}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_sapling.json
+========================================
+{"variants":{"":{"model":"dragoncraft:block/namek_sapling"}}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_cobblestone.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_cobblestone"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_dirty.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_dirty"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_stone.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_stone"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_floor_red.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_floor_red"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_floor_white.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_floor_white"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_wall.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_wall"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_yellow_block.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_yellow_block"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_dirty.json
+========================================
+{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/namek_dirty"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_grass.json
+========================================
+{"parent":"minecraft:block/grass_block","textures":{"bottom":"dragoncraft:block/namek_dirty","top":"dragoncraft:block/namek_grass_top","side":"dragoncraft:block/namek_grass_side"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_leaves.json
+========================================
+{"parent":"minecraft:block/leaves","textures":{"all":"dragoncraft:block/namek_leave"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_log.json
+========================================
+{"parent":"minecraft:block/cube_column","textures":{"end":"dragoncraft:block/namek_log_top","side":"dragoncraft:block/namek_log_side"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_sapling.json
+========================================
+{"parent":"minecraft:block/cross","textures":{"cross":"dragoncraft:block/namek_sapling"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/entity/dino1.json
+========================================
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.Velociraptor",
+				"texture_width": 256,
+				"texture_height": 256,
+				"visible_bounds_width": 14,
+				"visible_bounds_height": 4,
+				"visible_bounds_offset": [0, 1, 0]
+			},
+			"bones": [
+				{
+					"name": "body2",
+					"pivot": [0, 24, 0],
+					"cubes": [
+						{"origin": [-8.1, 17, 0.9], "size": [16.2, 16, 15.2], "uv": [0, 36]},
+						{"origin": [-7.1, 18, 16.1], "size": [14.2, 14, 6], "uv": [48, 108]},
+						{"origin": [-6.1, 19, 22.1], "size": [12.2, 12, 12], "uv": [0, 67]},
+						{"origin": [-5.1, 20, 34.1], "size": [10.2, 10, 15], "uv": [62, 36]},
+						{"origin": [-4.1, 21, 49.1], "size": [8.2, 8, 16], "uv": [72, 0]},
+						{"origin": [-3.1, 22, 65.1], "size": [6.2, 6, 19], "uv": [62, 61]},
+						{"origin": [-2.1, 23, 84.1], "size": [4.2, 4, 18], "uv": [96, 86]},
+						{"origin": [-7.1, 20, -18.1], "size": [14.2, 14, 22], "pivot": [0, 27, -8.6], "rotation": [-15, 0, 0], "uv": [0, 0]},
+						{"origin": [-5.1, 24, -24.1], "size": [10.2, 12, 8], "pivot": [0, 30, -20.6], "rotation": [-25, 0, 0], "uv": [112, 24]},
+						{"origin": [-4.1, 26, -30.1], "size": [8.2, 10, 9], "pivot": [0, 31, -20.6], "rotation": [-12.5, 0, 0], "uv": [112, 44]}
+					]
+				},
+				{
+					"name": "head",
+					"pivot": [0, 29, 0]
+				},
+				{
+					"name": "bone19",
+					"parent": "head",
+					"pivot": [0, 32, -29],
+					"cubes": [
+						{"origin": [-4.1, 31.9, -45.1], "size": [8.2, 6.2, 16.2], "inflate": 0.1, "uv": [48, 86]},
+						{"origin": [3.1, 34.9, -45.1], "size": [1, 2.2, 2.2], "inflate": 0.2, "uv": [104, 32]},
+						{"origin": [-4.1, 34.9, -45.1], "size": [1, 2.2, 2.2], "inflate": 0.2, "uv": [138, 81]},
+						{"origin": [-1.1, 29.9, -45], "size": [2.2, 2, 0], "uv": [42, 126]},
+						{"origin": [4.1, 29.9, -36.1], "size": [0, 2, 2], "uv": [84, 128]},
+						{"origin": [4.1, 30.42742, -33.64436], "size": [0, 3, 4], "uv": [34, 120]},
+						{"origin": [-4.1, 30.42742, -33.64436], "size": [0, 3, 4], "uv": [84, 133]},
+						{"origin": [-4.1, 29.9, -36.1], "size": [0, 2, 2], "uv": [80, 137]},
+						{"origin": [4.1, 29.9, -39.1], "size": [0, 2, 2], "uv": [92, 138]},
+						{"origin": [-4.1, 29.9, -39.1], "size": [0, 2, 2], "uv": [96, 138]},
+						{"origin": [4.1, 29.9, -42.1], "size": [0, 2, 2], "uv": [138, 108]},
+						{"origin": [-4.1, 29.9, -42.1], "size": [0, 2, 2], "uv": [138, 112]},
+						{"origin": [3.1, 29.9, -45.1], "size": [0, 2, 2], "pivot": [3.1, 30.9, -44.1], "rotation": [0, 52.5, 0], "uv": [138, 116]},
+						{"origin": [-3.1, 29.9, -45.1], "size": [0, 2, 2], "pivot": [-3.1, 30.9, -44.1], "rotation": [0, -52.5, 0], "uv": [138, 120]}
+					]
+				},
+				{
+					"name": "bone21",
+					"parent": "bone19",
+					"pivot": [4.6, 37.5, -35],
+					"cubes": [
+						{"origin": [3.1, 36.9, -37.1], "size": [2, 1.4, 3.6], "inflate": 0.2, "pivot": [4.6, 37.5, -35], "rotation": [10.23772, 12.3071, 2.20462], "uv": [94, 32]},
+						{"origin": [3.1, 33.9, -36.6], "size": [2, 1.2, 3.2], "inflate": 0.1, "pivot": [4.1, 34.5, -35], "rotation": [0, 12.5, 0], "uv": [102, 133]},
+						{"origin": [3.1, 34.9, -36.6], "size": [2, 2, 3.2], "pivot": [4.1, 35.9, -35], "rotation": [0, 12.5, 0], "uv": [128, 81]}
+					]
+				},
+				{
+					"name": "bone22",
+					"parent": "bone19",
+					"pivot": [-4.6, 37.5, -35],
+					"cubes": [
+						{"origin": [-5.1, 36.9, -37.1], "size": [2, 1.4, 3.6], "inflate": 0.2, "pivot": [-4.6, 37.5, -35], "rotation": [10.23772, -12.3071, -2.20462], "uv": [112, 133]},
+						{"origin": [-5.1, 33.9, -36.6], "size": [2, 1.2, 3.2], "inflate": 0.1, "pivot": [-4.1, 34.5, -35], "rotation": [0, -12.5, 0], "uv": [0, 136]},
+						{"origin": [-5.1, 34.9, -36.6], "size": [2, 2, 3.2], "pivot": [-4.1, 35.9, -35], "rotation": [0, -12.5, 0], "uv": [92, 133]}
+					]
+				},
+				{
+					"name": "bone20",
+					"parent": "head",
+					"pivot": [0, 31.9, -30],
+					"cubes": [
+						{"origin": [-4.1, 27.9, -45.1], "size": [8.2, 4, 16.2], "inflate": 0.1, "uv": [0, 91]},
+						{"origin": [-1.1, 31.9, -45], "size": [2.2, 2, 0], "uv": [140, 99]},
+						{"origin": [4.1, 31.9, -36.1], "size": [0, 2, 2], "uv": [138, 124]},
+						{"origin": [4.1, 31.9, -33.1], "size": [0, 3, 3], "uv": [42, 120]},
+						{"origin": [-4.1, 31.9, -33.1], "size": [0, 3, 3], "uv": [50, 137]},
+						{"origin": [-4.1, 31.9, -36.1], "size": [0, 2, 2], "uv": [138, 128]},
+						{"origin": [4.1, 31.9, -39.1], "size": [0, 2, 2], "uv": [138, 132]},
+						{"origin": [-4.1, 31.9, -39.1], "size": [0, 2, 2], "uv": [138, 136]},
+						{"origin": [4.1, 31.9, -42.1], "size": [0, 2, 2], "uv": [0, 140]},
+						{"origin": [-4.1, 31.9, -42.1], "size": [0, 2, 2], "uv": [4, 140]},
+						{"origin": [3.1, 31.9, -45.1], "size": [0, 2, 2], "pivot": [3.1, 32.9, -44.1], "rotation": [0, 52.5, 0], "uv": [84, 140]},
+						{"origin": [-3.1, 31.9, -45.1], "size": [0, 2, 2], "pivot": [-3.1, 32.9, -44.1], "rotation": [0, -52.5, 0], "uv": [140, 85]}
+					]
+				},
+				{
+					"name": "rightArm",
+					"pivot": [-5, 22, 0]
+				},
+				{
+					"name": "bone15",
+					"parent": "rightArm",
+					"pivot": [-6, 20, 0]
+				},
+				{
+					"name": "bone16",
+					"parent": "bone15",
+					"pivot": [-7.5, 20.5, -9.5],
+					"cubes": [
+						{"origin": [-10, 22, -12], "size": [4, 4, 4], "pivot": [-7.5, 20.5, -9.5], "rotation": [35, 0, 0], "uv": [94, 24]},
+						{"origin": [-9.5, 16, -11.5], "size": [3, 6, 3], "inflate": 0.3, "pivot": [-7.5, 20.5, -9.5], "rotation": [35, 0, 0], "uv": [48, 67]}
+					]
+				},
+				{
+					"name": "bone17",
+					"parent": "bone15",
+					"pivot": [-7.5, 16.5, -8.5],
+					"cubes": [
+						{"origin": [-9.5, 12, -10.5], "size": [3, 6, 3], "pivot": [-7.5, 16.5, -8.5], "rotation": [-60, 0, 0], "uv": [48, 76]}
+					]
+				},
+				{
+					"name": "bone18",
+					"parent": "bone15",
+					"pivot": [-8, 11.4387, -11.78437],
+					"rotation": [-17.5, 0, 0],
+					"cubes": [
+						{"origin": [-10, 12.125, -15.04663], "size": [4, 1.5, 4], "pivot": [-8, 12.875, -13.04663], "rotation": [-60, 0, 0], "uv": [112, 81]},
+						{"origin": [-10, 9.70994, -11.86362], "size": [1, 2.5, 1], "pivot": [-9.5, 10.95994, -11.36362], "rotation": [-60, 0, 0], "uv": [84, 33]},
+						{"origin": [-7, 9.70994, -11.86362], "size": [1, 3.5, 2], "pivot": [-6.5, 10.95994, -11.36362], "rotation": [-97.5, 0, 0], "uv": [110, 137]},
+						{"origin": [-8.5, 9.70994, -11.86362], "size": [1, 2.5, 1], "pivot": [-8, 10.95994, -11.36362], "rotation": [-60, 0, 0], "uv": [88, 33]}
+					]
+				},
+				{
+					"name": "leftArm",
+					"pivot": [6, 20, 0]
+				},
+				{
+					"name": "bone14",
+					"parent": "leftArm",
+					"pivot": [6, 20, 0]
+				},
+				{
+					"name": "bone11",
+					"parent": "bone14",
+					"pivot": [7.5, 20.5, -9.5],
+					"cubes": [
+						{"origin": [6, 22, -12], "size": [4, 4, 4], "pivot": [7.5, 20.5, -9.5], "rotation": [35, 0, 0], "uv": [56, 128]},
+						{"origin": [6.5, 16, -11.5], "size": [3, 6, 3], "inflate": 0.3, "pivot": [7.5, 20.5, -9.5], "rotation": [35, 0, 0], "uv": [34, 111]}
+					]
+				},
+				{
+					"name": "bone12",
+					"parent": "bone14",
+					"pivot": [7.5, 16.5, -8.5],
+					"cubes": [
+						{"origin": [6.5, 12, -10.5], "size": [3, 6, 3], "pivot": [7.5, 16.5, -8.5], "rotation": [-60, 0, 0], "uv": [72, 128]}
+					]
+				},
+				{
+					"name": "bone13",
+					"parent": "bone14",
+					"pivot": [8, 11.4387, -11.78437],
+					"rotation": [-17.5, 0, 0],
+					"cubes": [
+						{"origin": [6, 12.125, -15.04663], "size": [4, 1.5, 4], "pivot": [8, 12.875, -13.04663], "rotation": [-60, 0, 0], "uv": [120, 18]},
+						{"origin": [9, 9.70994, -11.86362], "size": [1, 2.5, 1], "pivot": [9.5, 10.95994, -11.36362], "rotation": [-60, 0, 0], "uv": [140, 93]},
+						{"origin": [6, 9.70994, -11.86362], "size": [1, 3.5, 2], "pivot": [6.5, 10.95994, -11.36362], "rotation": [-97.5, 0, 0], "uv": [116, 137]},
+						{"origin": [7.5, 9.70994, -11.86362], "size": [1, 2.5, 1], "pivot": [8, 10.95994, -11.36362], "rotation": [-60, 0, 0], "uv": [140, 96]}
+					]
+				},
+				{
+					"name": "rightLeg",
+					"pivot": [-8.9, 12, 0]
+				},
+				{
+					"name": "Root",
+					"parent": "rightLeg",
+					"pivot": [-9.92325, 23.04946, 8.28205]
+				},
+				{
+					"name": "base",
+					"parent": "Root",
+					"pivot": [-9.72139, 1.71665, 5.40466],
+					"cubes": [
+						{"origin": [-13.11, -0.09, 5.89], "size": [5.2, 3.2, 6.2], "uv": [72, 24]},
+						{"origin": [-14.3498, 0.10421, 4.11127], "size": [1.5, 2.2, 3], "pivot": [-13.5998, 1.20421, 5.61127], "rotation": [29.87229, 22.01609, 12.15123], "uv": [10, 136]},
+						{"origin": [-12.11, 0.31054, 3.50762], "size": [1.5, 2.2, 3], "pivot": [-11.36, 1.41054, 5.00762], "rotation": [27.5, 0, 0], "uv": [18, 136]},
+						{"origin": [-10.11, 0.31054, 3.50762], "size": [1.5, 2.2, 3], "pivot": [-9.36, 1.41054, 5.00762], "rotation": [27.5, 0, 0], "uv": [136, 18]},
+						{"origin": [-8.08418, 1.35945, 3.50773], "size": [1.5, 2.2, 3], "pivot": [-7.33418, 2.45945, 5.00773], "rotation": [-26.48996, -26.32776, -14.92735], "uv": [26, 136]},
+						{"origin": [-6.91434, 0.70515, 2.30372], "size": [1.5, 3.2, 1], "pivot": [-6.16434, 2.30515, 2.80372], "rotation": [-26.48996, -26.32776, -14.92735], "uv": [88, 140]}
+					]
+				},
+				{
+					"name": "Canela",
+					"parent": "Root",
+					"pivot": [-8.95161, 6.05436, 11.09481],
+					"cubes": [
+						{"origin": [-12.11, 1.98939, 8.57404], "size": [3.2, 12, 5.2], "pivot": [-10.51, 7.98939, 11.17404], "rotation": [-20, 0, 0], "uv": [122, 108]},
+						{"origin": [-9.45308, 4.89018, 9.85141], "size": [1.2, 2, 3], "pivot": [-8.85308, 5.89018, 11.35141], "rotation": [-170.29285, 74.25749, -126.65352], "uv": [56, 136]},
+						{"origin": [-8.09174, 3.78351, 9.75898], "size": [1.2, 1, 2], "pivot": [-7.49174, 4.28351, 10.75898], "rotation": [167.20715, 74.25749, -126.65352], "uv": [72, 33]}
+					]
+				},
+				{
+					"name": "Joelho",
+					"parent": "Root",
+					"pivot": [-10.51, 14.94523, 6.2532],
+					"cubes": [
+						{"origin": [-13.11, 11.94523, 3.1532], "size": [5.2, 6, 12.2], "pivot": [-10.51, 14.94523, 9.2532], "rotation": [-20, 0, 0], "uv": [112, 63]}
+					]
+				},
+				{
+					"name": "Coxa",
+					"parent": "Root",
+					"pivot": [-10.51, 21.48162, 7.37554],
+					"cubes": [
+						{"origin": [-14.11, 13.98162, 2.27554], "size": [7.2, 15, 10.2], "pivot": [-10.51, 21.48162, 7.37554], "rotation": [-20, 0, 0], "uv": [88, 108]}
+					]
+				},
+				{
+					"name": "leftLeg",
+					"pivot": [1.9, 12, 0]
+				},
+				{
+					"name": "root2",
+					"parent": "leftLeg",
+					"pivot": [9.92325, 23.04946, 8.28205]
+				},
+				{
+					"name": "base2",
+					"parent": "root2",
+					"pivot": [9.72139, 1.71665, 5.40466],
+					"cubes": [
+						{"origin": [7.91, -0.09, 5.89], "size": [5.2, 3.2, 6.2], "uv": [34, 128]},
+						{"origin": [12.8498, 0.10421, 4.11127], "size": [1.5, 2.2, 3], "pivot": [13.5998, 1.20421, 5.61127], "rotation": [29.87229, -22.01609, -12.15123], "uv": [64, 136]},
+						{"origin": [10.61, 0.31054, 3.50762], "size": [1.5, 2.2, 3], "pivot": [11.36, 1.41054, 5.00762], "rotation": [27.5, 0, 0], "uv": [34, 137]},
+						{"origin": [8.61, 0.31054, 3.50762], "size": [1.5, 2.2, 3], "pivot": [9.36, 1.41054, 5.00762], "rotation": [27.5, 0, 0], "uv": [42, 137]},
+						{"origin": [6.58418, 1.35945, 3.50773], "size": [1.5, 2.2, 3], "pivot": [7.33418, 2.45945, 5.00773], "rotation": [-26.48996, 26.32776, 14.92735], "uv": [72, 137]},
+						{"origin": [5.41434, 0.70515, 2.30372], "size": [1.5, 3.2, 1], "pivot": [6.16434, 2.30515, 2.80372], "rotation": [-26.48996, 26.32776, 14.92735], "uv": [140, 89]}
+					]
+				},
+				{
+					"name": "canela2",
+					"parent": "root2",
+					"pivot": [8.95161, 6.05436, 11.09481],
+					"cubes": [
+						{"origin": [8.91, 1.98939, 8.57404], "size": [3.2, 12, 5.2], "pivot": [10.51, 7.98939, 11.17404], "rotation": [-20, 0, 0], "uv": [122, 125]},
+						{"origin": [8.25308, 4.89018, 9.85141], "size": [1.2, 2, 3], "pivot": [8.85308, 5.89018, 11.35141], "rotation": [-170.29285, -74.25749, 126.65352], "uv": [102, 137]},
+						{"origin": [6.89174, 3.78351, 9.75898], "size": [1.2, 1, 2], "pivot": [7.49174, 4.28351, 10.75898], "rotation": [167.20715, -74.25749, 126.65352], "uv": [78, 33]}
+					]
+				},
+				{
+					"name": "joelho2",
+					"parent": "root2",
+					"pivot": [10.51, 14.94523, 6.2532],
+					"cubes": [
+						{"origin": [7.91, 11.94523, 3.1532], "size": [5.2, 6, 12.2], "pivot": [10.51, 14.94523, 9.2532], "rotation": [-20, 0, 0], "uv": [120, 0]}
+					]
+				},
+				{
+					"name": "coxa2",
+					"parent": "root2",
+					"pivot": [10.51, 21.48162, 7.37554],
+					"cubes": [
+						{"origin": [6.91, 13.98162, 2.27554], "size": [7.2, 15, 10.2], "pivot": [10.51, 21.48162, 7.37554], "rotation": [-20, 0, 0], "uv": [0, 111]}
+					]
+				},
+				{
+					"name": "rightItem",
+					"pivot": [-6, 15, 1]
+				}
+			]
+		}
+	]
+}
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_goku_armor.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_goku_armor"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_goku_bot.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_goku_bot"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_goku_leg.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_goku_leg"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_vegeta_armor.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_vegeta_armor"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_vegeta_bot.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_vegeta_bot"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dbi_vegeta_leg.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dbi_vegeta_leg"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dino_meat_cooked_raw.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dino_meat_cooked_raw"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dino_meat_raw.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/dino_meat_raw"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dirtystone_cobblestone.json
+========================================
+{"parent":"dragoncraft:block/dirtystone_cobblestone"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dirtystone_dirty.json
+========================================
+{"parent":"dragoncraft:block/dirtystone_dirty"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/dirtystone_stone.json
+========================================
+{"parent":"dragoncraft:block/dirtystone_stone"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/lookout_floor_red.json
+========================================
+{"parent":"dragoncraft:block/lookout_floor_red"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/lookout_floor_white.json
+========================================
+{"parent":"dragoncraft:block/lookout_floor_white"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/lookout_wall.json
+========================================
+{"parent":"dragoncraft:block/lookout_wall"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/lookout_yellow_block.json
+========================================
+{"parent":"dragoncraft:block/lookout_yellow_block"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_dirty.json
+========================================
+{"parent":"dragoncraft:block/namek_dirty"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_grass.json
+========================================
+{"parent":"dragoncraft:block/namek_grass"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_leaves.json
+========================================
+{"parent":"dragoncraft:block/namek_leaves"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_log.json
+========================================
+{"parent":"dragoncraft:block/namek_log"}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_sapling.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:block/namek_sapling"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/senzu1.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/senzu1"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/senzu2.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/senzu2"}}
+
+
+========================================
+ARQUIVO: src/main/resources/dragoncraft.mixins.json
+========================================
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.bernardo.dragoncraft.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+
+
+========================================
+ARQUIVO: src/main/resources/fabric.mod.json
+========================================
+{
+  "schemaVersion": 1,
+  "id": "dragoncraft",
+  "version": "${version}",
+  "name": "DragonCraft Z",
+  "description": "Bring the Dragon Ball universe to Minecraft. Choose your race, awaken your Ki and ascend beyond your limits.",
+  "authors": ["Bernardo"],
+  "contact": {
+    "sources": "https://github.com/Broly199372/DragonCraft-Z"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.bernardo.dragoncraft.DragonCraftZ"],
+    "client": ["com.bernardo.dragoncraft.DragonCraftZClient"]
+  },
+  "mixins": ["dragoncraft.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-language-kotlin": ">=1.11.0+kotlin.2.0.0",
+    "fabric": "*",
+    "minecraft": "~1.20.1"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
+
+

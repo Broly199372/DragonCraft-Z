@@ -1,1 +1,6 @@
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_floor_white"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/lookout_floor_white"
+  }
+}

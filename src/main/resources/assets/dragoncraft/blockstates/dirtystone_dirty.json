@@ -1,1 +1,7 @@
-{"variants":{"":{"model":"dragoncraft:block/dirtystone_dirty"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/dirtystone_dirty"
+    }
+  }
+}

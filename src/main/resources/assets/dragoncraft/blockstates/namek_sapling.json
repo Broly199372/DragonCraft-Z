@@ -1,1 +1,7 @@
-{"variants":{"":{"model":"dragoncraft:block/namek_sapling"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/namek_sapling"
+    }
+  }
+}

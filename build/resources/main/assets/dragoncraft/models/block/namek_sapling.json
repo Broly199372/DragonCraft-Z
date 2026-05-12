@@ -1,1 +1,6 @@
-{"parent":"minecraft:block/cross","textures":{"cross":"dragoncraft:block/namek_sapling"}}
+{
+  "parent": "minecraft:block/cross",
+  "textures": {
+    "cross": "dragoncraft:block/namek_sapling"
+  }
+}
