@@ -18,6 +18,7 @@ class SenzuBeanItem : DragonCraftFoodItem(
                 .hunger(20)
                 .saturationModifier(2.0f)
                 .alwaysEdible()
+                .snack() // Comer rápido
                 .build()
         )
         .maxCount(16)
@@ -28,17 +29,26 @@ class SenzuBeanItem : DragonCraftFoodItem(
     }
 
     override fun getMaxUseTime(stack: ItemStack): Int {
-        return 32
+        return 16 // Comer mais rápido
     }
 
     override fun use(world: World, user: PlayerEntity, hand: Hand): TypedActionResult<ItemStack> {
-        return TypedActionResult.consume(user.getStackInHand(hand))
+        val stack = user.getStackInHand(hand)
+        
+        if (user.canConsume(false)) {
+            user.setCurrentHand(hand) // IMPORTANTE: Define a mão ativa
+            return TypedActionResult.consume(stack)
+        }
+        
+        return TypedActionResult.fail(stack)
     }
 
     override fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {
         if (!world.isClient && user is PlayerEntity) {
             user.health = user.maxHealth
             user.clearStatusEffects()
+            user.hungerManager.foodLevel = 20
+            user.hungerManager.saturationLevel = 20.0f
         }
     }
 
@@ -50,5 +60,6 @@ class SenzuBeanItem : DragonCraftFoodItem(
     ) {
         tooltip.add(Text.literal("§aRestores full health and hunger"))
         tooltip.add(Text.literal("§7Clears all status effects"))
+        tooltip.add(Text.literal("§6Sacred bean from Korin Tower"))
     }
 }

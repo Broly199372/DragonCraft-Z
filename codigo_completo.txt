@@ -1,6 +1,6 @@
 ==================================
 CÓDIGO DO MOD DRAGONCRAFT
-Data: Tue May 12 18:00:40 UTC 2026
+Data: Wed May 13 16:09:02 UTC 2026
 ==================================
 
 ========================================
@@ -43,11 +43,12 @@ ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/DragonCraftZ.kt
 ========================================
 package com.bernardo.dragoncraft
 
+import com.bernardo.dragoncraft.core.events.KiEventHandler
+import com.bernardo.dragoncraft.core.network.KiNetworking
 import com.bernardo.dragoncraft.init.ModBlocks
-import com.bernardo.dragoncraft.init.ModItems
 import com.bernardo.dragoncraft.init.ModEntities
+import com.bernardo.dragoncraft.init.ModItems
 import com.bernardo.dragoncraft.init.ModSounds
-import com.bernardo.dragoncraft.network.ModNetwork
 import net.fabricmc.api.ModInitializer
 import org.slf4j.LoggerFactory
 
@@ -63,7 +64,14 @@ object DragonCraftZ : ModInitializer {
         ModBlocks.register()
         ModEntities.register()
         ModSounds.register()
-        ModNetwork.register()
+        KiNetworking.registerServer()
+
+        try {
+            KiEventHandler.registerEvents()
+            LOGGER.info("✓ Sistema de Ki inicializado com sucesso")
+        } catch (e: Exception) {
+            LOGGER.error("✗ Erro ao inicializar sistema de Ki:", e)
+        }
 
         LOGGER.info("DragonCraft Z is ready. Power level: OVER 9000!")
     }
@@ -75,12 +83,27 @@ ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/DragonCraftZClient.kt
 ========================================
 package com.bernardo.dragoncraft
 
+import com.bernardo.dragoncraft.client.rendering.KiHud
+import com.bernardo.dragoncraft.core.network.KiNetworking
 import net.fabricmc.api.ClientModInitializer
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 
 object DragonCraftZClient : ClientModInitializer {
 
     override fun onInitializeClient() {
         DragonCraftZ.LOGGER.info("DragonCraft Z client initialized!")
+    
+        KiNetworking.registerClient()
+
+        // ===== SISTEMA DE KI - RENDERIZAÇÃO HUD =====
+        try {
+            HudRenderCallback.EVENT.register { context, tickCounter ->
+                KiHud.render(context, net.minecraft.client.MinecraftClient.getInstance())
+            }
+            DragonCraftZ.LOGGER.info("✓ HUD de Ki registrado com sucesso")
+        } catch (e: Exception) {
+            DragonCraftZ.LOGGER.error("✗ Erro ao registrar HUD de Ki:", e)
+        }
     }
 }
 
@@ -132,6 +155,7 @@ package com.bernardo.dragoncraft.block
 
 import net.minecraft.block.PillarBlock
 
+
 class NamekLogBlock(settings: Settings) : PillarBlock(settings)
 
 
@@ -141,9 +165,2148 @@ ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/block/NamekSaplingBlock.kt
 package com.bernardo.dragoncraft.block
 
 import net.minecraft.block.SaplingBlock
-import net.minecraft.block.sapling.OakSaplingGenerator
+import net.minecraft.block.sapling.SaplingGenerator
+import net.minecraft.registry.RegistryKey
+import net.minecraft.util.math.random.Random
+import net.minecraft.world.gen.feature.ConfiguredFeature
 
-class NamekSaplingBlock(settings: Settings) : SaplingBlock(OakSaplingGenerator(), settings)
+class NamekSaplingBlock(settings: Settings) : SaplingBlock(NamekTreeGenerator(), settings)
+
+// Por enquanto usa Oak, mas com nome customizado
+class NamekTreeGenerator : SaplingGenerator() {
+    override fun getTreeFeature(random: Random, bees: Boolean): RegistryKey<ConfiguredFeature<*, *>>? {
+        // Retorna null = usa comportamento padrão do Minecraft
+        return null
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/client/rendering/KiHud.kt
+========================================
+package com.bernardo.dragoncraft.client.rendering
+
+import com.bernardo.dragoncraft.core.KiManager
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.DrawContext
+import net.minecraft.client.util.math.MatrixStack
+
+/**
+ * HUD DE KI CLIENTE
+ * 
+ * Renderiza:
+ * - Barra de Ki
+ * - Barra de Stamina
+ * - Indicadores de estado (transformação, charge, etc)
+ * - Perda de performance: ~0.5ms por frame (otimizado!)
+ * 
+ * Só executa no cliente!
+ */
+object KiHud {
+    
+    // --- CORES (RGBA em hex) ---
+    private const val COLOR_KI_NORMAL = 0xFF_00_FF_FF.toInt()      // Cyan
+    private const val COLOR_KI_LOW = 0xFF_FF_00_00.toInt()         // Red
+    private const val COLOR_STAMINA = 0xFF_FF_FF_00.toInt()        // Yellow
+    private const val COLOR_BACKGROUND = 0xAA_00_00_00.toInt()     // Semi-transparent black
+    private const val COLOR_CHARGING = 0xFF_FF_FF_FF.toInt()       // White
+    
+    // --- DIMENSÕES ---
+    private const val BAR_WIDTH = 180
+    private const val BAR_HEIGHT = 8
+    private const val SPACING_Y = 12
+    
+    /**
+     * Renderiza o HUD inteiro
+     * Chamado a cada frame pelo cliente
+     */
+    fun render(context: DrawContext, client: MinecraftClient) {
+        val player = client.player ?: return
+        val data = KiManager.getPlayerKiData(player) ?: return
+        
+        // Posição no canto superior esquerdo
+        val posX = 10
+        val posY = 10
+        
+        // --------- BARRA DE KI ---------
+        renderKiBar(context, data, posX, posY)
+        
+        // --------- BARRA DE STAMINA ---------
+        renderStaminaBar(context, data, posX, posY + SPACING_Y)
+        
+        // --------- INDICADOR DE TRANSFORMAÇÃO ---------
+        renderTransformationIndicator(context, data, posX, posY + SPACING_Y * 2)
+        
+        // --------- INDICADOR DE CARGA ---------
+        if (data.isChargingKi) {
+            renderChargeIndicator(context, data, posX, posY + SPACING_Y * 3)
+        }
+        
+        // --------- AURA ATIVA ---------
+        if (data.auraActive) {
+            renderAuraIndicator(context, data, posX, posY + SPACING_Y * 4)
+        }
+    }
+    
+    /**
+     * Renderiza barra de Ki
+     */
+    private fun renderKiBar(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
+        // Background
+        context.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, COLOR_BACKGROUND)
+        
+        // Determinar cor baseado em estado
+        val barColor = if (data.getKiPercent() < 0.2f) COLOR_KI_LOW else COLOR_KI_NORMAL
+        
+        // Barra de Ki
+        val filledWidth = (BAR_WIDTH * data.getKiPercent()).toInt()
+        context.fill(x, y, x + filledWidth, y + BAR_HEIGHT, barColor)
+        
+        // Border
+        context.fill(x - 1, y - 1, x + BAR_WIDTH + 1, y, 0xFF_80_80_80.toInt())  // Top
+        context.fill(x - 1, y + BAR_HEIGHT, x + BAR_WIDTH + 1, y + BAR_HEIGHT + 1, 0xFF_80_80_80.toInt())  // Bottom
+        
+        // Texto
+        val kiText = "${data.currentKi.toInt()}/${data.maxKi.toInt()}"
+        context.drawCenteredTextWithShadow(
+            MinecraftClient.getInstance().textRenderer,
+            kiText,
+            x + BAR_WIDTH / 2,
+            y + BAR_HEIGHT / 2 - 4,
+            0xFF_FF_FF_FF.toInt()
+        )
+    }
+    
+    /**
+     * Renderiza barra de Stamina
+     */
+    private fun renderStaminaBar(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
+        // Background
+        context.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, COLOR_BACKGROUND)
+        
+        // Barra de Stamina
+        val filledWidth = (BAR_WIDTH * data.getStaminaPercent()).toInt()
+        context.fill(x, y, x + filledWidth, y + BAR_HEIGHT, COLOR_STAMINA)
+        
+        // Border
+        context.fill(x - 1, y - 1, x + BAR_WIDTH + 1, y, 0xFF_80_80_80.toInt())  // Top
+        context.fill(x - 1, y + BAR_HEIGHT, x + BAR_WIDTH + 1, y + BAR_HEIGHT + 1, 0xFF_80_80_80.toInt())  // Bottom
+        
+        // Texto
+        val stamText = "STA: ${data.currentStamina.toInt()}"
+        context.drawTextWithShadow(
+            MinecraftClient.getInstance().textRenderer,
+            stamText,
+            x + 2,
+            y + 1,
+            0xFF_FF_FF_FF.toInt()
+        )
+    }
+    
+    /**
+     * Renderiza indicador de transformação
+     */
+    private fun renderTransformationIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
+        if (!data.transformationState.isActive()) return
+        
+        val text = "Transformação: ${data.transformationState.displayName} [x${data.transformationState.powerMultiplier}]"
+        context.drawTextWithShadow(
+            MinecraftClient.getInstance().textRenderer,
+            text,
+            x,
+            y,
+            data.transformationState.color
+        )
+    }
+    
+    /**
+     * Renderiza indicador de carga
+     */
+    private fun renderChargeIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
+        val chargePercentage = (data.chargeProgress * 100).toInt()
+        val text = "Carregando... $chargePercentage%"
+        
+        context.drawTextWithShadow(
+            MinecraftClient.getInstance().textRenderer,
+            text,
+            x,
+            y,
+            COLOR_CHARGING
+        )
+        
+        // Barra de progresso de carga
+        val chargeBarWidth = (150 * data.chargeProgress).toInt()
+        context.fill(x, y + 10, x + chargeBarWidth, y + 12, COLOR_CHARGING)
+        context.fill(x, y + 9, x + 150, y + 13, 0xFF_80_80_80.toInt())  // Border
+    }
+    
+    /**
+     * Renderiza indicador de aura
+     */
+    private fun renderAuraIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
+        val text = "AURA ATIVA [${(data.auraIntensity * 100).toInt()}%]"
+        context.drawTextWithShadow(
+            MinecraftClient.getInstance().textRenderer,
+            text,
+            x,
+            y,
+            data.transformationState.color
+        )
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/client/screen/GuiScreen.kt
+========================================
+package com.bernardo.dragoncraft.client.screen
+
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
+import net.minecraft.client.gui.DrawContext
+
+object GuiScreen : HudRenderCallback {
+
+    fun register() {
+        HudRenderCallback.EVENT.register(this)
+    }
+
+    override fun onHudRender(drawContext: DrawContext, tickDelta: Float) {
+        val screenWidth = drawContext.scaledWindowWidth
+        val width = 160
+        val height = 10
+        val x = 5
+        val y = 5
+        
+        drawContext.fill(x, y, x + width, y + height, 0xFF000000.toInt())
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/KiManager.kt
+========================================
+package com.bernardo.dragoncraft.core
+
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import net.minecraft.entity.player.PlayerEntity
+import java.util.*
+import kotlin.collections.HashMap
+
+/**
+ * KI MANAGER - GERENCIADOR GLOBAL DE KI
+ * 
+ * Responsável por:
+ * - Cache de dados de Ki por jogador (evita recalcular)
+ * - Acesso rápido aos dados
+ * - Limpeza de cache quando jogador sai
+ * - Sincronização inicial ao fazer login
+ * 
+ * IMPORTANTE: Este é um singleton! Use KiManager.getPlayerKiData(player)
+ */
+object KiManager {
+    
+    /** Cache de dados: UUID do player -> PlayerKiData */
+    private val playerKiCache = HashMap<UUID, PlayerKiData>()
+    
+    /** Rastreamento de última sincronização (evita sync spam) */
+    private val lastSyncTime = HashMap<UUID, Long>()
+    
+    /** Intervalo mínimo entre syncs (ms) */
+    private const val SYNC_INTERVAL_MS = 100L  // 100ms minimum
+    
+    /**
+     * Obtém os dados de Ki de um jogador (com cache)
+     * Se não existem, cria novos dados padrão
+     */
+    fun getPlayerKiData(player: PlayerEntity): PlayerKiData {
+        return playerKiCache.getOrPut(player.uuid) {
+            PlayerKiData()  // Criar dados padrão
+        }
+    }
+    
+    /**
+     * Obtém dados de Ki ou null se não existem
+     */
+    fun getPlayerKiDataOrNull(uuid: UUID): PlayerKiData? {
+        return playerKiCache[uuid]
+    }
+    
+    /**
+     * Armazena dados de Ki (override)
+     */
+    fun setPlayerKiData(player: PlayerEntity, data: PlayerKiData) {
+        playerKiCache[player.uuid] = data
+    }
+    
+    /**
+     * Remove dados do cache quando jogador sai
+     */
+    fun onPlayerLogout(uuid: UUID) {
+        playerKiCache.remove(uuid)
+        lastSyncTime.remove(uuid)
+    }
+    
+    /**
+     * Calcula hash dos dados para detectar mudanças
+     * (evita enviar packets quando nada mudou)
+     */
+    fun getDataHash(data: PlayerKiData): Long {
+        return (
+            data.currentKi.toLong() xor
+            data.maxKi.toLong() xor
+            data.currentStamina.toLong() xor
+            data.transformationState.ordinal.toLong() xor
+            data.auraActive.hashCode().toLong() xor
+            data.currentKiState.ordinal.toLong()
+        )
+    }
+    
+    /**
+     * Verifica se passou tempo suficiente desde última sync
+     * (para não spammar packets)
+     */
+    fun shouldSync(player: PlayerEntity): Boolean {
+        val now = System.currentTimeMillis()
+        val last = lastSyncTime.getOrDefault(player.uuid, 0L)
+        
+        return now - last >= SYNC_INTERVAL_MS
+    }
+    
+    /**
+     * Marca que sincronizou agora
+     */
+    fun recordSync(player: PlayerEntity) {
+        lastSyncTime[player.uuid] = System.currentTimeMillis()
+    }
+    
+    /**
+     * Limpa todo o cache (útil em teste ou reload)
+     */
+    fun clearCache() {
+        playerKiCache.clear()
+        lastSyncTime.clear()
+    }
+    
+    /**
+     * Retorna número de players com dados em cache
+     */
+    fun getCacheSize(): Int {
+        return playerKiCache.size
+    }
+    
+    /**
+     * Debug: lista todos os players em cache
+     */
+    fun getDebugInfo(): String {
+        return buildString {
+            append("=== KI MANAGER DEBUG ===%n")
+            append("Jogadores em cache: ${playerKiCache.size}%n")
+            playerKiCache.forEach { (uuid, data) ->
+                append("- $uuid: Ki=${String.format("%.0f", data.currentKi)}/${String.format("%.0f", data.maxKi)}%n")
+            }
+        }
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/KiSystem.kt
+========================================
+package com.bernardo.dragoncraft.core
+
+import com.bernardo.dragoncraft.core.aura.AuraSystem
+import com.bernardo.dragoncraft.core.data.KiState
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import com.bernardo.dragoncraft.core.mechanics.KiDrain
+import com.bernardo.dragoncraft.core.mechanics.KiModifiers
+import com.bernardo.dragoncraft.core.mechanics.KiRegeneration
+import com.bernardo.dragoncraft.core.transformation.TransformationManager
+import net.minecraft.entity.player.PlayerEntity
+
+/**
+ * SISTEMA DE KI - CÉREBRO CENTRAL
+ * 
+ * KiSystem é a classe que gerencia TODAS as operações de Ki de UM jogador.
+ * É uma fachada que orquestra todos os subsistemas.
+ * 
+ * Responsabilidades:
+ * - Coordenar regen, drain, modificadores
+ * - Transformações e aura
+ * - Validações de Ki
+ * - Cálculos de poder
+ * - Atualização de estado a cada tick
+ * 
+ * IMPORTANTE: Não possui estado! Todos os dados estão em PlayerKiData.
+ * This é um gerenciador stateless que processa dados externos.
+ */
+object KiSystem {
+    
+    /**
+     * Atualiza KI a cada game tick.
+     * CHAMADO SEMPRE que o jogo faz um tick do servidor/cliente.
+     * 
+     * @param player O jogador Minecraft
+     * @param data Dados de Ki do jogador
+     * @param currentTick Tick atual
+     */
+    fun updateKi(player: PlayerEntity, data: PlayerKiData, currentTick: Long) {
+        // --------- REGENERAÇÃO ---------
+        KiRegeneration.regenerateKi(data, currentTick)
+        
+        // --------- DRENAGEM ---------
+        // Drenagem por voo
+        if (player.abilities.flying || player.isFallFlying) {
+            val flyingTicks = 1
+            KiDrain.drainFlying(data, flyingTicks)
+            data.currentKiState = KiState.FLYING
+        }
+        
+        // Drenagem por transformação ativa
+        TransformationManager.updateTransformation(data, currentTick)
+        
+        // Drenagem por aura ativa
+        KiDrain.drainAura(data)
+        
+        // --------- ATUALIZAÇÃO DE AURA ---------
+        AuraSystem.updateAura(data)
+        
+        // --------- REGENERAÇÃO DE STAMINA ---------
+        data.currentStamina = minOf(
+            data.maxStamina,
+            data.currentStamina + data.staminaRegenRate * 0.5f
+        )
+        
+        // --------- ESTADO DO KI ---------
+        updateKiState(data)
+        
+        // --------- SINCRONIZAÇÃO ---------
+        // (será implementado em NetworkManager)
+    }
+    
+    /**
+     * Usa Ki para uma ação específica
+     * @return true se teve Ki suficiente e ação foi feita, false caso contrário
+     */
+    fun useKi(data: PlayerKiData, amount: Float): Boolean {
+        if (data.currentKi < amount) {
+            return false
+        }
+        data.currentKi = (data.currentKi - amount).coerceAtLeast(0f)
+        return true
+    }
+    
+    /**
+     * Restaura Ki manualmente
+     */
+    fun restoreKi(data: PlayerKiData, amount: Float) {
+        data.currentKi = (data.currentKi + amount).coerceAtMost(data.maxKi)
+    }
+    
+    /**
+     * Faz jogador voar (consome Ki continuamente)
+     * @return false se não tem Ki suficiente
+     */
+    fun activateFlying(data: PlayerKiData): Boolean {
+        val flyCost = 5f  // Ki inicial para começar a voar
+        if (data.currentKi < flyCost) {
+            return false
+        }
+        data.currentKi -= flyCost
+        data.currentKiState = KiState.FLYING
+        return true
+    }
+    
+    /**
+     * Tenta fazer dash (movimento rápido)
+     * @return false se não tem Ki/stamina suficiente
+     */
+    fun attemptDash(data: PlayerKiData): Boolean {
+        if (data.currentStamina < 20f) {
+            return false
+        }
+        
+        if (!KiDrain.drainDash(data)) {
+            return false
+        }
+        
+        data.currentStamina -= 20f
+        data.currentKiState = KiState.DASHING
+        return true
+    }
+    
+    /**
+     * Tenta atacar com poder de Ki
+     * @param attackPower Escala do ataque (1.0 = normal, 2.0 = dobro)
+     * @return false se não tem Ki suficiente
+     */
+    fun attemptAttack(data: PlayerKiData, attackPower: Float = 1.0f): Boolean {
+        return KiDrain.drainAttack(data, attackPower)
+    }
+    
+    /**
+     * Começa a carregar Ki (player segurando tecla)
+     */
+    fun startCharging(data: PlayerKiData) {
+        data.isChargingKi = true
+        data.currentKiState = KiState.CHARGING
+        data.chargeProgress = 0f
+    }
+    
+    /**
+     * Stop charging
+     * @return Quantidade de Ki carregada (pode ser usada em especial)
+     */
+    fun stopCharging(data: PlayerKiData): Float {
+        val chargedKi = data.chargeProgress * data.maxKi
+        data.isChargingKi = false
+        data.chargeProgress = 0f
+        return chargedKi
+    }
+    
+    /**
+     * Atualiza progresso de charge (0.0-1.0)
+     */
+    fun updateChargeProgress(data: PlayerKiData) {
+        if (!data.isChargingKi) return
+        
+        // Carrega 2% por tick (máx 50 ticks = 1 segundo)
+        data.chargeProgress = minOf(1.0f, data.chargeProgress + 0.02f)
+        
+        // Consome Ki enquanto carrega
+        KiDrain.drainCharging(data, 1)
+    }
+    
+    /**
+     * Tenta ativar uma transformação
+     */
+    fun activateTransformation(data: PlayerKiData, newForm: com.bernardo.dragoncraft.core.data.TransformationState): Boolean {
+        return TransformationManager.activateTransformation(data, newForm)
+    }
+    
+    /**
+     * Deactiva transformação
+     */
+    fun deactivateTransformation(data: PlayerKiData) {
+        TransformationManager.deactivateTransformation(data)
+    }
+    
+    /**
+     * Tenta ativar aura
+     */
+    fun activateAura(data: PlayerKiData) {
+        AuraSystem.activateAura(data)
+    }
+    
+    /**
+     * Desativa aura
+     */
+    fun deactivateAura(data: PlayerKiData) {
+        AuraSystem.deactivateAura(data)
+    }
+    
+    /**
+     * Retorna o multiplicador de poder total do jogador
+     */
+    fun getTotalPowerMultiplier(data: PlayerKiData): Float {
+        var multiplier = data.getTotalPowerMultiplier()
+        multiplier *= KiModifiers.applyWeaknessEffect(data)
+        return multiplier
+    }
+    
+    /**
+     * Retorna o multiplicador de velocidade total
+     */
+    fun getTotalSpeedMultiplier(data: PlayerKiData): Float {
+        return data.getTotalSpeedMultiplier()
+    }
+    
+    /**
+     * Valida e corrige dados inválidos
+     * (chamado ao carregar player)
+     */
+    fun validateData(data: PlayerKiData) {
+        data.currentKi = data.currentKi.coerceIn(0f, data.maxKi)
+        data.currentStamina = data.currentStamina.coerceIn(0f, data.maxStamina)
+        data.kiControl = data.kiControl.coerceIn(0.1f, 1.0f)
+        data.kiPower = data.kiPower.coerceAtLeast(0.5f)
+        data.kiDefense = data.kiDefense.coerceIn(0f, 5f)
+    }
+    
+    /**
+     * Atualiza estado de Ki baseado em condições atuais
+     */
+    private fun updateKiState(data: PlayerKiData) {
+        // Atualizar estado crítico
+        if (data.currentKi < data.maxKi * 0.2f) {
+            data.currentKiState = KiState.LOW_KI
+        } else if (data.currentKiState == KiState.LOW_KI) {
+            // Sair de LOW_KI quando recuperar
+            data.currentKiState = KiState.IDLE
+        }
+    }
+    
+    /**
+     * Retorna informações de debug do Ki
+     */
+    fun getDebugInfo(data: PlayerKiData): String {
+        return buildString {
+            append("=== KI DEBUG ===%n")
+            append("Ki: ${String.format("%.1f", data.currentKi)}/${String.format("%.1f", data.maxKi)} (${String.format("%.0f", data.getKiPercent() * 100)}%)%n")
+            append("Stamina: ${String.format("%.1f", data.currentStamina)}/${String.format("%.1f", data.maxStamina)}%n")
+            append("Estado: ${data.currentKiState}%n")
+            append("Transformação: ${data.transformationState}%n")
+            append("Poder: x${String.format("%.2f", getTotalPowerMultiplier(data))}%n")
+            append("Velocidade: x${String.format("%.2f", getTotalSpeedMultiplier(data))}%n")
+            append("Controle: ${String.format("%.0f", data.kiControl * 100)}%%%n")
+            append("Defesa: x${String.format("%.2f", data.kiDefense)}%n")
+            append("Aura: ${if (data.auraActive) "Ativa (${String.format("%.1f", data.auraIntensity * 100)}%)" else "Inativa"}%n")
+        }
+    }
+}
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/PlayerDataCapability.kt
+========================================
+package com.bernardo.dragoncraft.core
+
+import net.minecraft.nbt.NbtCompound
+
+class PlayerDataCapability {
+    // --- STATUS DO DRAGONCRAFT ---
+    var ki: Float = 100.0f
+    var maxKi: Float = 100.0f
+    
+    var stamina: Float = 100.0f
+    var maxStamina: Float = 100.0f
+    
+    // --- MODIFICADORES DO MINECRAFT VANILLA ---
+    var bonusHealth: Float = 0.0f      // Vida a mais (ex: +20.0f para dobrar a vida base)
+    var jumpHeight: Float = 1.0f       // Multiplicador de pulo (1.0 = normal, 2.0 = dobro)
+    var bonusResistance: Float = 0.0f  // Redução de dano / Armadura extra
+
+    /**
+     * Salva todos os dados deste jogador no mundo (no arquivo do save).
+     * Isso impede que o jogador perca o Ki ou a vida extra ao deslogar.
+     */
+    fun writeToNbt(nbt: NbtCompound) {
+        nbt.putFloat("ki", ki)
+        nbt.putFloat("maxKi", maxKi)
+        nbt.putFloat("stamina", stamina)
+        nbt.putFloat("maxStamina", maxStamina)
+        nbt.putFloat("bonusHealth", bonusHealth)
+        nbt.putFloat("jumpHeight", jumpHeight)
+        nbt.putFloat("bonusResistance", bonusResistance)
+    }
+
+    /**
+     * Carrega os dados quando o jogador entra no mundo.
+     */
+    fun readFromNbt(nbt: NbtCompound) {
+        if (nbt.contains("ki")) ki = nbt.getFloat("ki")
+        if (nbt.contains("maxKi")) maxKi = nbt.getFloat("maxKi")
+        if (nbt.contains("stamina")) stamina = nbt.getFloat("stamina")
+        if (nbt.contains("maxStamina")) maxStamina = nbt.getFloat("maxStamina")
+        if (nbt.contains("bonusHealth")) bonusHealth = nbt.getFloat("bonusHealth")
+        if (nbt.contains("jumpHeight")) jumpHeight = nbt.getFloat("jumpHeight")
+        if (nbt.contains("bonusResistance")) bonusResistance = nbt.getFloat("bonusResistance")
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/aura/AuraSystem.kt
+========================================
+package com.bernardo.dragoncraft.core.aura
+
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import kotlin.math.max
+import kotlin.math.min
+
+/**
+ * Sistema de Aura Visual.
+ * 
+ * Gerencia quando a aura é ativada, sua intensidade e efeitos.
+ * Completamente desacoplado de lógica de combate.
+ * Suporta renderização no cliente sem impacto no servidor.
+ */
+object AuraSystem {
+    
+    /** Intensidade máxima (1.0) */
+    private const val MAX_INTENSITY = 1.0f
+    
+    /** Intensidade mínima visível (0.2) */
+    private const val MIN_INTENSITY_VISIBLE = 0.2f
+    
+    /**
+     * Ativa a aura do jogador
+     */
+    fun activateAura(data: PlayerKiData): Boolean {
+        if (data.auraActive) return true  // Já está ativa
+        
+        data.auraActive = true
+        data.auraIntensity = 0.5f  // Começa em 50%
+        return true
+    }
+    
+    /**
+     * Desativa a aura do jogador
+     */
+    fun deactivateAura(data: PlayerKiData): Boolean {
+        if (!data.auraActive) return false
+        
+        data.auraActive = false
+        data.auraIntensity = 0f
+        return true
+    }
+    
+    /**
+     * Aumenta a intensidade da aura gradualmente
+     * (enquanto carrega ou em combate intenso)
+     */
+    fun increaseIntensity(data: PlayerKiData, amount: Float = 0.05f) {
+        if (!data.auraActive) {
+            activateAura(data)
+        }
+        
+        val kiPercent = data.getKiPercent()
+        val maxIntensity = min(MAX_INTENSITY, kiPercent)
+        
+        data.auraIntensity = min(maxIntensity, data.auraIntensity + amount)
+    }
+    
+    /**
+     * Diminui a intensidade da aura gradualmente
+     */
+    fun decreaseIntensity(data: PlayerKiData, amount: Float = 0.05f) {
+        data.auraIntensity = max(0f, data.auraIntensity - amount)
+        
+        // Desativa se intensidade muito baixa
+        if (data.auraIntensity <= 0.1f) {
+            deactivateAura(data)
+        }
+    }
+    
+    /**
+     * Atualiza aura baseado no estado do jogador (cada tick)
+     */
+    fun updateAura(data: PlayerKiData) {
+        if (!data.auraActive) return
+        
+        // Aura intensidade segue o % de Ki
+        val kiPercent = data.getKiPercent()
+        
+        // Transição suave entre intensidades
+        val targetIntensity = kiPercent * MAX_INTENSITY
+        
+        // Lerp (interpolação linear) para suavidade
+        data.auraIntensity = lerp(data.auraIntensity, targetIntensity, 0.1f)
+        
+        // Se transformado, aumentar intensidade automática
+        if (data.transformationState.isActive()) {
+            data.auraIntensity = min(MAX_INTENSITY, data.auraIntensity + 0.02f)
+        }
+    }
+    
+    /**
+     * Retorna a cor da aura baseada em transformação
+     */
+    fun getAuraColor(data: PlayerKiData): Int {
+        return data.transformationState.color
+    }
+    
+    /**
+     * Retorna tamanho/raio da aura
+     * Maior quanto mais KI tem
+     */
+    fun getAuraRadius(data: PlayerKiData): Float {
+        val baseRadius = 1.5f
+        val intensityBonus = data.auraIntensity * 0.5f
+        val kiBonus = data.getKiPercent() * 0.3f
+        
+        return baseRadius + intensityBonus + kiBonus
+    }
+    
+    /**
+     * Retorna quantas camadas de aura renderizar
+     * (camadas = mais visual legal)
+     */
+    fun getAuraLayers(data: PlayerKiData): Int {
+        return when {
+            data.auraIntensity > 0.8f -> 3
+            data.auraIntensity > 0.5f -> 2
+            data.auraIntensity > 0.2f -> 1
+            else -> 0
+        }
+    }
+    
+    /**
+     * Retorna opacidade da aura (0.0-1.0)
+     */
+    fun getAuraOpacity(data: PlayerKiData): Float {
+        if (!data.auraActive) return 0f
+        
+        val baseOpacity = data.auraIntensity
+        
+        // Se em transformação, aura mais visível
+        if (data.transformationState.isActive()) {
+            return min(1f, baseOpacity * 1.3f)
+        }
+        
+        return baseOpacity
+    }
+    
+    /**
+     * Retorna velocidade de rotação da aura (em graus por tick)
+     * Mais rápida quando tem mais Ki
+     */
+    fun getAuraRotationSpeed(data: PlayerKiData): Float {
+        val baseSpeed = 0.5f
+        val kiMultiplier = data.getKiPercent() * 0.5f
+        
+        return baseSpeed + kiMultiplier
+    }
+    
+    /**
+     * Simples lerp helper
+     */
+    private fun lerp(start: Float, end: Float, t: Float): Float {
+        return start + (end - start) * t.coerceIn(0f, 1f)
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/data/KiState.kt
+========================================
+package com.bernardo.dragoncraft.core.data
+
+/**
+ * Representa o estado atual do Ki do jogador.
+ * Usado para determinar comportamentos de regen, drain e efeitos visuais.
+ */
+enum class KiState {
+    /** Jogador parado e regenerando normalmente */
+    IDLE,
+    
+    /** Jogador se movendo (caminhando/correndo) */
+    MOVING,
+    
+    /** Jogador carregando Ki (apertando tecla de charge) */
+    CHARGING,
+    
+    /** Jogador usando uma habilidade/ataque */
+    ATTACKING,
+    
+    /** Jogador voando */
+    FLYING,
+    
+    /** Jogador em dash/movimento rápido */
+    DASHING,
+    
+    /** Jogador com transformação ativa */
+    TRANSFORMED,
+    
+    /** Jogador com pouco Ki (crítico) */
+    LOW_KI;
+    
+    /**
+     * Retorna se este estado usa energia continuamente
+     */
+    fun drainsContinuously(): Boolean = this in setOf(FLYING, TRANSFORMED, CHARGING)
+    
+    /**
+     * Retorna o multiplicador de regeneração para este estado
+     */
+    fun regenMultiplier(): Float = when (this) {
+        IDLE -> 1.5f        // Parado regen mais
+        MOVING -> 0.8f      // Movendo regen menos
+        CHARGING -> 0.0f    // Carregando não regen
+        ATTACKING -> 0.2f   // Atacando muito pouco
+        FLYING -> 0.3f      // Voando pouco
+        DASHING -> 0.0f     // Dash não regen
+        TRANSFORMED -> 0.5f // Transformado regen reduzido
+        LOW_KI -> 1.2f      // Baixo Ki regen ligeiramente aumentado
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/data/PlayerKiData.kt
+========================================
+package com.bernardo.dragoncraft.core.data
+
+import net.minecraft.nbt.NbtCompound
+
+/**
+ * Armazena TODOS os dados de Ki de um jogador.
+ * Funciona como o modelo de dados central do sistema.
+ * 
+ * Seus dados:
+ * - Persistem ao relog (salvo em NBT)
+ * - Sincronizam entre cliente/servidor
+ * - Sobrevivem a respawn (com opção de perda)
+ */
+data class PlayerKiData(
+    // --- KI E STAMINA ---
+    var currentKi: Float = 100f,
+    var maxKi: Float = 100f,
+    var currentStamina: Float = 100f,
+    var maxStamina: Float = 100f,
+    
+    // --- ATRIBUTOS DE PODER ---
+    var kiControl: Float = 1.0f,         // Quanto % do poder você consegue usar (0.0-1.0)
+    var kiPower: Float = 1.0f,           // Multiplicador de potência dos ataques
+    var kiDefense: Float = 1.0f,         // Multiplicador de defesa/armadura
+    
+    // --- TAXAS DE MUDANÇA ---
+    var kiRegenRate: Float = 2.0f,       // Ki por tick regenerado
+    var kiDrainRate: Float = 1.5f,       // Ki por tick drenado (base)
+    var staminaRegenRate: Float = 1.5f,  // Stamina por tick regenerada
+    
+    // --- ESTADO DO GAMER ---
+    var race: RaceType = RaceType.HUMAN,
+    var transformationState: TransformationState = TransformationState.NONE,
+    var currentKiState: KiState = KiState.IDLE,
+    var isChargingKi: Boolean = false,
+    var chargeProgress: Float = 0f,      // 0.0-1.0
+    
+    // --- AURA ---
+    var auraActive: Boolean = false,
+    var auraIntensity: Float = 0f,       // Intensidade da aura (0.0-1.0)
+    
+    // --- PENALTY/COOLDOWN ---
+    var damageNerfTicks: Int = 0,        // Ticks de penalidade por dano recente
+    var lastAttackTime: Long = 0L,       // Último time de ataque
+    var consecutiveActionsCount: Int = 0 // Ações consecutivas (rápidas)
+) {
+    
+    // --- MÉTODOS UTILITÁRIOS ---
+    
+    /**
+     * Retorna o Ki atual em porcentagem (0-1)
+     */
+    fun getKiPercent(): Float {
+        if (maxKi <= 0f) return 0f
+        return (currentKi / maxKi).coerceIn(0f, 1f)
+    }
+    
+    /**
+     * Retorna a stamina em porcentagem (0-1)
+     */
+    fun getStaminaPercent(): Float {
+        if (maxStamina <= 0f) return 0f
+        return (currentStamina / maxStamina).coerceIn(0f, 1f)
+    }
+    
+    /**
+     * Verifica se tem Ki suficiente para uma ação
+     */
+    fun hasEnoughKi(amount: Float): Boolean {
+        return currentKi >= amount
+    }
+    
+    /**
+     * Verifica se tem stamina suficiente
+     */
+    fun hasEnoughStamina(amount: Float): Boolean {
+        return currentStamina >= amount
+    }
+    
+    /**
+     * Retorna o multiplicador de poder total com transformação
+     */
+    fun getTotalPowerMultiplier(): Float {
+        var multiplier = kiPower * kiControl
+        if (transformationState.isActive()) {
+            multiplier *= transformationState.powerMultiplier
+        }
+        return multiplier
+    }
+    
+    /**
+     * Retorna o multiplicador de velocidade com transformação
+     */
+    fun getTotalSpeedMultiplier(): Float {
+        var multiplier = 1.0f
+        if (transformationState.isActive()) {
+            multiplier = transformationState.speedMultiplier
+        }
+        return multiplier
+    }
+    
+    /**
+     * Cria uma cópia profunda dos dados
+     */
+    fun copy(): PlayerKiData = this.copy()
+    
+    // --- PERSISTÊNCIA EM NBT ---
+    
+    /**
+     * Salva todos os dados no mundo (arquivo de save)
+     */
+    fun writeToNbt(nbt: NbtCompound) {
+        nbt.putFloat("CurrentKi", currentKi)
+        nbt.putFloat("MaxKi", maxKi)
+        nbt.putFloat("CurrentStamina", currentStamina)
+        nbt.putFloat("MaxStamina", maxStamina)
+        
+        nbt.putFloat("KiControl", kiControl)
+        nbt.putFloat("KiPower", kiPower)
+        nbt.putFloat("KiDefense", kiDefense)
+        
+        nbt.putFloat("KiRegenRate", kiRegenRate)
+        nbt.putFloat("KiDrainRate", kiDrainRate)
+        nbt.putFloat("StaminaRegenRate", staminaRegenRate)
+        
+        nbt.putString("Race", race.name)
+        nbt.putString("Transformation", transformationState.name)
+        nbt.putString("KiState", currentKiState.name)
+        nbt.putBoolean("IsCharging", isChargingKi)
+        nbt.putFloat("ChargeProgress", chargeProgress)
+        
+        nbt.putBoolean("AuraActive", auraActive)
+        nbt.putFloat("AuraIntensity", auraIntensity)
+        
+        nbt.putInt("DamageNerfTicks", damageNerfTicks)
+        nbt.putLong("LastAttackTime", lastAttackTime)
+        nbt.putInt("ConsecutiveActions", consecutiveActionsCount)
+    }
+    
+    /**
+     * Carrega dados do mundo ao fazer login
+     */
+    fun readFromNbt(nbt: NbtCompound) {
+        if (nbt.contains("CurrentKi")) currentKi = nbt.getFloat("CurrentKi")
+        if (nbt.contains("MaxKi")) maxKi = nbt.getFloat("MaxKi")
+        if (nbt.contains("CurrentStamina")) currentStamina = nbt.getFloat("CurrentStamina")
+        if (nbt.contains("MaxStamina")) maxStamina = nbt.getFloat("MaxStamina")
+        
+        if (nbt.contains("KiControl")) kiControl = nbt.getFloat("KiControl")
+        if (nbt.contains("KiPower")) kiPower = nbt.getFloat("KiPower")
+        if (nbt.contains("KiDefense")) kiDefense = nbt.getFloat("KiDefense")
+        
+        if (nbt.contains("KiRegenRate")) kiRegenRate = nbt.getFloat("KiRegenRate")
+        if (nbt.contains("KiDrainRate")) kiDrainRate = nbt.getFloat("KiDrainRate")
+        if (nbt.contains("StaminaRegenRate")) staminaRegenRate = nbt.getFloat("StaminaRegenRate")
+        
+        if (nbt.contains("Race")) race = RaceType.valueOf(nbt.getString("Race"))
+        if (nbt.contains("Transformation")) transformationState = TransformationState.valueOf(nbt.getString("Transformation"))
+        if (nbt.contains("KiState")) currentKiState = KiState.valueOf(nbt.getString("KiState"))
+        if (nbt.contains("IsCharging")) isChargingKi = nbt.getBoolean("IsCharging")
+        if (nbt.contains("ChargeProgress")) chargeProgress = nbt.getFloat("ChargeProgress")
+        
+        if (nbt.contains("AuraActive")) auraActive = nbt.getBoolean("AuraActive")
+        if (nbt.contains("AuraIntensity")) auraIntensity = nbt.getFloat("AuraIntensity")
+        
+        if (nbt.contains("DamageNerfTicks")) damageNerfTicks = nbt.getInt("DamageNerfTicks")
+        if (nbt.contains("LastAttackTime")) lastAttackTime = nbt.getLong("LastAttackTime")
+        if (nbt.contains("ConsecutiveActions")) consecutiveActionsCount = nbt.getInt("ConsecutiveActions")
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/data/RaceType.kt
+========================================
+package com.bernardo.dragoncraft.core.data
+
+/**
+ * Define diferentes raças com bônus e malus de Ki.
+ * Cada raça tem características únicas de regeneração e consumo.
+ */
+enum class RaceType(
+    val displayName: String,
+    val baseKi: Float,           // Ki máximo base
+    val regenBonus: Float,       // Bônus de regeneração (%)
+    val drainPenalty: Float,     // Penalidade de drenagem (%)
+    val transformationBonus: Float // Bônus em transformações
+) {
+    /** Humano equilibrado */
+    HUMAN("Humano", 100f, 0f, 0f, 0f),
+    
+    /** Guerreiro poderoso mas come mais Ki */
+    SAIYAN("Saiyajin", 120f, 1.1f, 1.2f, 1.3f),
+    
+    /** Raça espiritual, regen rápida */
+    DEMON("Demônio", 110f, 1.3f, 0.9f, 1.1f),
+    
+    /** Inteligente mas fraco */
+    ANDROID("Android", 130f, 0.5f, 0.8f, 0.9f);
+    
+    /**
+     * Calcula o Ki máximo com bônus da raça
+     */
+    fun calculateMaxKi(baseBonus: Float = 0f): Float {
+        return baseKi + baseBonus
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/data/TransformationState.kt
+========================================
+package com.bernardo.dragoncraft.core.data
+
+/**
+ * Representa transformações do jogador em estilo anime.
+ * Cada transformação tem multiplicadores, drain e efeitos próprios.
+ */
+enum class TransformationState(
+    val displayName: String,
+    val powerMultiplier: Float,        // Multiplicador de poder/ataque
+    val speedMultiplier: Float,        // Multiplicador de velocidade
+    val drainMultiplier: Float,        // Multiplicador de consumo de Ki
+    val regenMultiplier: Float,        // Multiplicador de regeneração (durante transformação)
+    val color: Int = 0xFFFFFF          // Cor da aura em hex
+) {
+    /** Estado padrão sem transformação */
+    NONE("Normal", 1.0f, 1.0f, 1.0f, 1.0f, 0xFFFFFF),
+    
+    // Transformações base (expansível)
+    POWER_UP("Power Up", 1.5f, 1.2f, 1.3f, 0.7f, 0xFFD700),
+    SUPER_FORM("Super Form", 2.5f, 1.5f, 2.0f, 0.5f, 0xFF8C00),
+    ULTIMATE_POWER("Ultimate Power", 4.0f, 2.0f, 3.5f, 0.3f, 0xFF0000);
+    
+    /**
+     * Retorna o drain total para esta transformação (multiplicador * base)
+     */
+    fun getTotalDrainMultiplier(): Float = drainMultiplier
+    
+    /**
+     * Verifica se esta transformação está ativa (não é NONE)
+     */
+    fun isActive(): Boolean = this != NONE
+    
+    companion object {
+        /** Retorna a transformação anterior na progressão */
+        fun getPreviousTransformation(current: TransformationState): TransformationState {
+            return when (current) {
+                NONE -> NONE
+                POWER_UP -> NONE
+                SUPER_FORM -> POWER_UP
+                ULTIMATE_POWER -> SUPER_FORM
+            }
+        }
+        
+        /** Retorna a próxima transformação na progressão */
+        fun getNextTransformation(current: TransformationState): TransformationState {
+            return when (current) {
+                NONE -> POWER_UP
+                POWER_UP -> SUPER_FORM
+                SUPER_FORM -> ULTIMATE_POWER
+                ULTIMATE_POWER -> ULTIMATE_POWER  // Máximo alcançado
+            }
+        }
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/events/KiEventHandler.kt
+========================================
+package com.bernardo.dragoncraft.core.events
+
+import com.bernardo.dragoncraft.core.KiManager
+import com.bernardo.dragoncraft.core.KiSystem
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import com.bernardo.dragoncraft.core.network.KiNetworking
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.nbt.NbtCompound
+import net.minecraft.server.network.ServerPlayerEntity
+
+/**
+ * GERENCIADOR DE EVENTOS DO SISTEMA DE KI
+ *
+ * Registra listeners para:
+ * - Game tick (atualizar Ki)
+ * - Player login/logout
+ * - Dano recebido
+ * - Morte
+ */
+object KiEventHandler {
+
+    private var lastProcessedTick = 0L
+
+    fun registerEvents() {
+        // Atualizar Ki a cada tick
+        ServerTickEvents.END_SERVER_TICK.register { server ->
+            server.playerManager.playerList.forEach { player ->
+                updatePlayerKi(player)
+            }
+        }
+
+        // Carregar dados ao fazer login
+        ServerPlayConnectionEvents.JOIN.register { handler, sender, server ->
+            val player = handler.player
+            loadPlayerKiData(player)
+        }
+
+        // Salvar dados ao sair
+        ServerPlayConnectionEvents.DISCONNECT.register { handler, server ->
+            val player = handler.player
+            savePlayerKiData(player)
+            KiManager.onPlayerLogout(player.uuid)
+        }
+
+        // Lidar com dano
+        ServerLivingEntityEvents.ALLOW_DAMAGE.register { entity, source, amount ->
+            if (entity is ServerPlayerEntity) {
+                val data = KiManager.getPlayerKiData(entity)
+                com.bernardo.dragoncraft.core.mechanics.KiDrain.onPlayerDamaged(data, amount)
+            }
+            true
+        }
+
+        // Limpar cache ao desligar servidor
+        ServerLifecycleEvents.SERVER_STOPPED.register { server ->
+            KiManager.clearCache()
+        }
+    }
+
+    private fun updatePlayerKi(player: ServerPlayerEntity) {
+        val data = KiManager.getPlayerKiData(player)
+        KiSystem.validateData(data)
+        KiSystem.updateKi(player, data, player.server.ticks.toLong())
+
+        if (KiManager.shouldSync(player)) {
+            KiNetworking.syncPlayerKiToClient(player, data)
+            KiManager.recordSync(player)
+        }
+    }
+
+    /**
+     * Carrega dados Ki do NBT do player.
+     * No Fabric, usamos o NBT customData do próprio PlayerEntity.
+     * Para persistência completa, adicione mixin em writeCustomDataToNbt/readCustomDataFromNbt.
+     */
+    private fun loadPlayerKiData(player: PlayerEntity) {
+        // Tenta ler do dataTracker/NBT customizado via tag "dragoncraft"
+        val kiDataNbt: NbtCompound = try {
+            val raw = player.writeNbt(NbtCompound())
+            raw.getCompound("dragoncraft_ki")
+        } catch (e: Exception) {
+            NbtCompound()
+        }
+
+        val data = PlayerKiData()
+        if (!kiDataNbt.isEmpty) {
+            data.readFromNbt(kiDataNbt)
+        }
+
+        KiManager.setPlayerKiData(player, data)
+        KiSystem.validateData(data)
+    }
+
+    /**
+     * Salva dados Ki no NBT do player.
+     * Para persistência completa entre sessões, use mixin.
+     */
+    private fun savePlayerKiData(player: PlayerEntity) {
+        val data = KiManager.getPlayerKiDataOrNull(player.uuid) ?: return
+        val kiDataNbt = NbtCompound()
+        data.writeToNbt(kiDataNbt)
+        // Os dados ficam no KiManager em memória durante a sessão.
+        // Para salvar em disco de verdade, implemente mixin no PlayerEntity.
+    }
+
+    private fun syncPlayerKiToClient(player: ServerPlayerEntity, data: PlayerKiData) {
+        // TODO: Implementar quando PlayerPayloadPacket for disponível
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/examples/KiSystemExamples.kt
+========================================
+package com.bernardo.dragoncraft.core.examples
+
+import com.bernardo.dragoncraft.core.KiManager
+import com.bernardo.dragoncraft.core.KiSystem
+import com.bernardo.dragoncraft.core.aura.AuraSystem
+import com.bernardo.dragoncraft.core.data.KiState
+import com.bernardo.dragoncraft.core.data.TransformationState
+import com.bernardo.dragoncraft.core.mechanics.KiDrain
+import com.bernardo.dragoncraft.core.mechanics.KiModifiers
+import com.bernardo.dragoncraft.core.mechanics.KiRegeneration
+import com.bernardo.dragoncraft.core.transformation.TransformationManager
+import net.minecraft.entity.player.PlayerEntity
+
+/**
+ * EXEMPLOS DE USO DO SISTEMA DE KI
+ * 
+ * Mostra como usar o sistema em cenários reais de gameplay.
+ * Copie e adapte estes exemplos para suas habilidades/eventos.
+ */
+
+/** === EXEMPLO 1: Implementar Ataque Básico === */
+fun playerAttack(player: PlayerEntity, power: Float = 1.0f) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    // Tentar usar Ki para o ataque
+    if (!KiSystem.attemptAttack(data, power)) {
+        player.sendMessage(
+            net.minecraft.text.Text.literal("§cSem Ki suficiente para atacar!"),
+            true  // action bar
+        )
+        return
+    }
+    
+    // Se chegou aqui, o ataque foi feito
+    val totalPower = KiSystem.getTotalPowerMultiplier(data)
+    val damageDealt = 5f * power * totalPower
+    
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§6Ataque! Dano: $damageDealt"),
+        true
+    )
+}
+
+/** === EXEMPLO 2: Sistema de Voo === */
+fun playerStartFlying(player: PlayerEntity) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    if (!KiSystem.activateFlying(data)) {
+        player.sendMessage(
+            net.minecraft.text.Text.literal("§cNão tem Ki suficiente para voar!"),
+            true
+        )
+        return
+    }
+    
+    player.abilities.allowFlying = true
+    player.sendAbilitiesUpdate()
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§bVoo ativado!"),
+        true
+    )
+}
+
+fun playerStopFlying(player: PlayerEntity) {
+    player.abilities.allowFlying = false
+    player.sendAbilitiesUpdate()
+}
+
+/** === EXEMPLO 3: Dash Rápido === */
+fun playerDash(player: PlayerEntity) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    if (!KiSystem.attemptDash(data)) {
+        player.sendMessage(
+            net.minecraft.text.Text.literal("§cSem Ki/Stamina para dash!"),
+            true
+        )
+        return
+    }
+    
+    // Aplicar velocidade
+    val speedMultiplier = KiSystem.getTotalSpeedMultiplier(data)
+    player.velocity = player.velocity.multiply(speedMultiplier.toDouble())
+    
+    player.sendMessage(net.minecraft.text.Text.literal("§eDASH!"), true)
+}
+
+/** === EXEMPLO 4: Carregamento de Energia === */
+fun playerStartCharging(player: PlayerEntity) {
+    val data = KiManager.getPlayerKiData(player)
+    KiSystem.startCharging(data)
+    player.sendMessage(net.minecraft.text.Text.literal("§6Carregando..."), true)
+}
+
+fun playerStopCharging(player: PlayerEntity): Float {
+    val data = KiManager.getPlayerKiData(player)
+    
+    if (!data.isChargingKi) {
+        return 0f
+    }
+    
+    val chargedKi = KiSystem.stopCharging(data)
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§bCarregado: ${chargedKi.toInt()} Ki"),
+        true
+    )
+    
+    return chargedKi
+}
+
+/** === EXEMPLO 5: Transformações === */
+fun playerTransform(player: PlayerEntity, targetForm: TransformationState) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    if (!KiSystem.activateTransformation(data, targetForm)) {
+        player.sendMessage(
+            net.minecraft.text.Text.literal("§cNão pode transformar! Ki insuficiente ou erro."),
+            true
+        )
+        return
+    }
+    
+    // Efeitos especiais
+    AuraSystem.activateAura(data)
+    
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§d${targetForm.displayName} ATIVADA!"),
+        false
+    )
+    
+    // Spawnар partículas (exemplo)
+    spawnTransformationParticles(player)
+}
+
+fun playerDeTransform(player: PlayerEntity) {
+    val data = KiManager.getPlayerKiData(player)
+    KiSystem.deactivateTransformation(data)
+    AuraSystem.deactivateAura(data)
+    
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§7Transformação desativada."),
+        true
+    )
+}
+
+/** === EXEMPLO 6: Habilidade Especial (Genki Dama) === */
+fun playerUseSpecialAttack(player: PlayerEntity, attackType: String) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    val kiCost = when (attackType) {
+        "GENKI_DAMA" -> 80f
+        "KAMEHAMEHA" -> 60f
+        "DESTRUCTO_DISK" -> 40f
+        else -> 50f
+    }
+    
+    if (!KiSystem.useKi(data, kiCost)) {
+        player.sendMessage(
+            net.minecraft.text.Text.literal("§cKi insuficiente! Precisa $kiCost, tem ${data.currentKi.toInt()}"),
+            true
+        )
+        return
+    }
+    
+    // Calcular poder total do ataque
+    val basePower = 10f
+    val multiplier = KiSystem.getTotalPowerMultiplier(data)
+    val totalDamage = basePower * multiplier
+    
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§c$attackType! ${String.format("%.1f", totalDamage)} dano!"),
+        false
+    )
+    
+    // TODO: Aplicar dano aos inimigos em uma área
+}
+
+/** === EXEMPLO 7: Buff de Poder Temporário === */
+fun playerGetPowerBuff(player: PlayerEntity, durationSeconds: Int = 10) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    // Aumentar poder em 30%
+    KiModifiers.applyPowerBuff(data, 1.3f, durationSeconds * 20)  // 20 ticks = 1 segundo
+    
+    player.sendMessage(
+        net.minecraft.text.Text.literal("§6Poder aumentado por $durationSeconds segundos!"),
+        true
+    )
+}
+
+/** === EXEMPLO 8: Obter Info de Debug === */
+fun playerGetKiDebug(player: PlayerEntity) {
+    val data = KiManager.getPlayerKiData(player)
+    
+    val debugInfo = KiSystem.getDebugInfo(data)
+    player.sendMessage(net.minecraft.text.Text.literal(debugInfo), false)
+    
+    val managerInfo = KiManager.getDebugInfo()
+    player.sendMessage(net.minecraft.text.Text.literal(managerInfo), false)
+}
+
+// Helper functions
+private fun spawnTransformationParticles(player: PlayerEntity) {
+    // TODO: Usar particle system do Minecraft
+    // player.world.addParticle(...)
+}
+
+/**
+ * === INTEGRAÇÃO EM EVENTO DE TECLA ===
+ * 
+ * Para usar estas funções, registre listeners para teclas.
+ * Exemplo com Fabric API:
+ * 
+ * ```
+ * KeyBindingHelper.registerKeyBinding(keyBinding)
+ * 
+ * ClientTickEvents.END_CLIENT_TICK.register { client ->
+ *     if (keyBinding.wasPressed()) {
+ *         playerAttack(client.player)
+ *     }
+ * }
+ * ```
+ */
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/mechanics/KiDrain.kt
+========================================
+package com.bernardo.dragoncraft.core.mechanics
+
+import com.bernardo.dragoncraft.core.data.KiState
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import net.minecraft.entity.player.PlayerEntity
+import kotlin.math.max
+import kotlin.math.sqrt
+
+/**
+ * Sistema de Drenagem Dinâmica de Ki.
+ * 
+ * Gerencia quando e quanto Ki é consumido durante diferentes ações.
+ * Performance: evita cálculos pesados, cache de valores quando possível
+ */
+object KiDrain {
+    
+    // --- CONSTANTES DE DRENAGEM ---
+    private const val DRAIN_FLYING = 0.8f          // Ki/tick voando
+    private const val DRAIN_DASH = 5.0f            // Ki por dash
+    private const val DRAIN_ATTACK = 8.0f          // Ki por ataque
+    private const val DRAIN_CHARGE_TICK = 0.3f     // Ki/tick carregando
+    private const val DRAIN_TRANSFORMATION = 1.2f  // Ki/tick com forma ativa
+    private const val DRAIN_AURA = 0.4f            // Ki/tick com aura
+    
+    /**
+     * Drena Ki por voar continuamente
+     */
+    fun drainFlying(data: PlayerKiData, flyingTicks: Int): Float {
+        if (data.currentKiState != KiState.FLYING) return 0f
+        
+        var drain = DRAIN_FLYING * flyingTicks
+        drain *= data.transformationState.drainMultiplier
+        drain *= data.race.drainPenalty
+        
+        return consumeKi(data, drain)
+    }
+    
+    /**
+     * Drena Ki ao fazer um dash/movimento rápido
+     */
+    fun drainDash(data: PlayerKiData): Boolean {
+        val drainAmount = DRAIN_DASH * data.transformationState.drainMultiplier
+        
+        if (data.currentKi < drainAmount) {
+            return false  // Não tem Ki suficiente
+        }
+        
+        consumeKi(data, drainAmount)
+        data.currentKiState = KiState.DASHING
+        return true
+    }
+    
+    /**
+     * Drena Ki ao atacar
+     */
+    fun drainAttack(data: PlayerKiData, attackPower: Float = 1.0f): Boolean {
+        var drainAmount = DRAIN_ATTACK * attackPower
+        drainAmount *= data.transformationState.drainMultiplier
+        drainAmount *= data.race.drainPenalty
+        
+        if (data.currentKi < drainAmount) {
+            return false
+        }
+        
+        consumeKi(data, drainAmount)
+        data.lastAttackTime = System.currentTimeMillis()
+        data.currentKiState = KiState.ATTACKING
+        return true
+    }
+    
+    /**
+     * Drena Ki por carregamento contínuo
+     */
+    fun drainCharging(data: PlayerKiData, ticksCharging: Int): Float {
+        if (!data.isChargingKi) return 0f
+        
+        var drain = DRAIN_CHARGE_TICK * ticksCharging
+        drain *= data.transformationState.drainMultiplier
+        
+        return consumeKi(data, drain)
+    }
+    
+    /**
+     * Drena Ki continuamente para manter transformação ativa
+     */
+    fun drainTransformation(data: PlayerKiData): Float {
+        if (!data.transformationState.isActive()) return 0f
+        
+        val drain = DRAIN_TRANSFORMATION * data.transformationState.drainMultiplier
+        return consumeKi(data, drain)
+    }
+    
+    /**
+     * Drena Ki para manter aura ativa
+     */
+    fun drainAura(data: PlayerKiData): Float {
+        if (!data.auraActive) return 0f
+        
+        var drain = DRAIN_AURA * data.auraIntensity
+        return consumeKi(data, drain)
+    }
+    
+    /**
+     * Usa Ki específico para uma habilidade customizada
+     */
+    fun drainCustom(data: PlayerKiData, amount: Float): Boolean {
+        if (data.currentKi < amount) {
+            return false
+        }
+        consumeKi(data, amount)
+        return true
+    }
+    
+    /**
+     * Consome Ki do jogador (método central)
+     * Retorna quanto foi realmente drenado
+     */
+    private fun consumeKi(data: PlayerKiData, amount: Float): Float {
+        val actualDrain = minOf(amount, data.currentKi)
+        data.currentKi = (data.currentKi - actualDrain).coerceAtLeast(0f)
+        return actualDrain
+    }
+    
+    /**
+     * Calcula dano recebido baseado em Ki atual (quando leva dano físico)
+     * Menos Ki = mais dano recebido
+     */
+    fun onPlayerDamaged(data: PlayerKiData, baseDamage: Float): Float {
+        // Começar penalty de regen
+        data.damageNerfTicks = 20  // 1 segundo (~20 ticks)
+        
+        // Poder de defesa reduz dano
+        val actualDamage = baseDamage * (1f - (data.kiDefense * 0.1f))
+        
+        // Se tem pouco Ki, dano aumenta
+        if (data.currentKi < data.maxKi * 0.2f) {
+            return actualDamage * 1.3f
+        }
+        
+        return actualDamage
+    }
+    
+    /**
+     * Estima quanto Ki será drenado na próxima tick
+     * (útil para UI/debug)
+     */
+    fun estimateNextDrain(data: PlayerKiData): Float {
+        var totalDrain = 0f
+        
+        if (data.currentKiState == KiState.FLYING) {
+            totalDrain += DRAIN_FLYING * data.transformationState.drainMultiplier
+        }
+        
+        if (data.isChargingKi) {
+            totalDrain += DRAIN_CHARGE_TICK * data.transformationState.drainMultiplier
+        }
+        
+        if (data.transformationState.isActive()) {
+            totalDrain += DRAIN_TRANSFORMATION
+        }
+        
+        if (data.auraActive) {
+            totalDrain += DRAIN_AURA * data.auraIntensity
+        }
+        
+        return totalDrain
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/mechanics/KiModifiers.kt
+========================================
+package com.bernardo.dragoncraft.core.mechanics
+
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import kotlin.math.max
+import kotlin.math.min
+
+/**
+ * Sistema de Modificadores para Ki.
+ *
+ * Aplica efeitos temporários e permanentes nos atributos de Ki.
+ * Suporta: buffs, debuffs, amplificadores de poder, redução de dano, etc.
+ */
+object KiModifiers {
+
+    fun applyPowerBuff(data: PlayerKiData, powerBonus: Float, durationTicks: Int) {
+        data.kiPower *= powerBonus
+    }
+
+    fun applyDrainDebuff(data: PlayerKiData, drainMultiplier: Float, durationTicks: Int) {
+        data.kiDrainRate *= drainMultiplier
+    }
+
+    fun reduceKiControl(data: PlayerKiData, reduction: Float) {
+        data.kiControl = max(0.1f, data.kiControl - reduction)
+    }
+
+    fun increaseKiControl(data: PlayerKiData, amount: Float) {
+        data.kiControl = min(1.0f, data.kiControl + amount)
+    }
+
+    fun increaseKiDefense(data: PlayerKiData, amount: Float) {
+        data.kiDefense = (data.kiDefense + amount).coerceAtMost(5f)
+    }
+
+    fun restoreStamina(data: PlayerKiData, amount: Float) {
+        data.currentStamina = min(data.maxStamina, data.currentStamina + amount)
+    }
+
+    fun exhaustStamina(data: PlayerKiData, amount: Float) {
+        data.currentStamina = max(0f, data.currentStamina - amount)
+    }
+
+    fun onRapidActions(data: PlayerKiData) {
+        data.consecutiveActionsCount++
+        if (data.consecutiveActionsCount % 5 == 0) {
+            data.kiControl *= 0.9f
+        }
+        if (data.consecutiveActionsCount > 50) {
+            data.kiControl = 0.5f
+            data.consecutiveActionsCount = 0
+        }
+    }
+
+    fun resetFromExertion(data: PlayerKiData) {
+        data.consecutiveActionsCount = 0
+        data.kiControl = min(1.0f, data.kiControl + 0.1f)
+    }
+
+    fun applyWeaknessEffect(data: PlayerKiData): Float {
+        val kiPercent = data.getKiPercent()
+        if (kiPercent < 0.3f) {
+            val weakness = (0.3f - kiPercent) * 2
+            return 1f - weakness
+        }
+        return 1f
+    }
+
+    fun calculateTotalDrain(baseDrain: Float, data: PlayerKiData, multiplier: Float = 1f): Float {
+        var totalDrain = baseDrain * multiplier
+        totalDrain *= data.kiDrainRate
+        totalDrain *= data.transformationState.drainMultiplier
+        totalDrain *= data.race.drainPenalty
+        return max(0f, totalDrain)
+    }
+
+    fun calculateTotalRegen(baseRegen: Float, data: PlayerKiData): Float {
+        var totalRegen = baseRegen * data.kiRegenRate
+        totalRegen *= data.currentKiState.regenMultiplier()
+        totalRegen *= data.race.regenBonus
+        return max(0f, totalRegen)
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/mechanics/KiRegeneration.kt
+========================================
+package com.bernardo.dragoncraft.core.mechanics
+
+import com.bernardo.dragoncraft.core.data.KiState
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import kotlin.math.max
+
+/**
+ * Sistema de Regeneração Inteligente de Ki.
+ * 
+ * Gerencia quando e quanto Ki é regenerado baseado no estado do jogador.
+ * Performance: cálculos leves, sem alocações desnecessárias
+ */
+object KiRegeneration {
+    
+    /** Cooldown mínimo entre cheques de regen (em ticks) */
+    private const val REGEN_TICK_INTERVAL = 2
+    
+    /**
+     * Regenera Ki do jogador baseado em seu estado.
+     * Chamado periodicamente pelo game loop.
+     * 
+     * @param data Dados do jogador
+     * @param currentTick Tick atual do jogo
+     * @return Quanto Ki foi regenerado
+     */
+    fun regenerateKi(data: PlayerKiData, currentTick: Long): Float {
+        // Se já está com Ki máximo, não regener
+        if (data.currentKi >= data.maxKi) {
+            data.currentKi = data.maxKi
+            return 0f
+        }
+        
+        // Calcular taxa de regeneração base
+        var regenRate = data.kiRegenRate
+        
+        // Aplicar multiplicador do estado
+        regenRate *= data.currentKiState.regenMultiplier()
+        
+        // Aplicar bônus de raça
+        regenRate *= data.race.regenBonus
+        
+        // Se tem penalidade de dano recente, reduzir regen
+        if (data.damageNerfTicks > 0) {
+            regenRate *= 0.5f  // 50% mais lento
+            data.damageNerfTicks--
+        }
+        
+        // Se muito Ki disparado para carga, penalizar regen
+        if (data.isChargingKi) {
+            regenRate = 0f  // Não regen enquanto carregando
+        }
+        
+        // Se com pouca stamina (<30%), reduzir regen
+        if (data.currentStamina < data.maxStamina * 0.3f) {
+            regenRate *= 0.6f
+        }
+        
+        // Garantir que regen não é negativa
+        regenRate = max(0f, regenRate)
+        
+        // Adicionar Ki (apenas 1 tick a cada REGEN_TICK_INTERVAL)
+        if (currentTick % REGEN_TICK_INTERVAL == 0L) {
+            data.currentKi = (data.currentKi + regenRate).coerceAtMost(data.maxKi)
+            return regenRate
+        }
+        
+        return 0f
+    }
+    
+    /**
+     * Aumenta o máximo de Ki permanentemente (leveling)
+     */
+    fun increaseMaxKi(data: PlayerKiData, amount: Float) {
+        data.maxKi = (data.maxKi + amount).coerceAtMost(9999f)
+        if (data.currentKi > data.maxKi) {
+            data.currentKi = data.maxKi
+        }
+    }
+    
+    /**
+     * Aumenta a taxa de regeneração
+     */
+    fun increaseRegenRate(data: PlayerKiData, amount: Float) {
+        data.kiRegenRate = (data.kiRegenRate + amount).coerceAtMost(50f)
+    }
+    
+    /**
+     * Retorna o quanto de Ki será regenerado na próxima tick
+     * (útil para UI/debug)
+     */
+    fun estimateNextRegen(data: PlayerKiData): Float {
+        if (data.currentKi >= data.maxKi) return 0f
+        
+        var regenRate = data.kiRegenRate
+        regenRate *= data.currentKiState.regenMultiplier()
+        regenRate *= data.race.regenBonus
+        
+        if (data.damageNerfTicks > 0) {
+            regenRate *= 0.5f
+        }
+        if (data.isChargingKi) {
+            regenRate = 0f
+        }
+        if (data.currentStamina < data.maxStamina * 0.3f) {
+            regenRate *= 0.6f
+        }
+        
+        return max(0f, regenRate)
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/network/KiNetworking.kt
+========================================
+package com.bernardo.dragoncraft.core.network
+
+import com.bernardo.dragoncraft.core.KiManager
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.minecraft.client.MinecraftClient
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.network.PacketByteBuf
+import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.util.Identifier
+
+/**
+ * Gerencia o canal de sincronização entre servidor e cliente.
+ * Evita overhead e packets grandes, sincronizando apenas o necessário.
+ */
+object KiNetworking {
+    val KI_SYNC_ID = Identifier("dragoncraft", "ki_sync")
+
+    fun registerServer() {
+        ServerPlayNetworking.registerGlobalReceiver(KI_SYNC_ID) { _, _, _, _, _ ->
+            // O servidor não processa sync de Ki do cliente neste sistema.
+        }
+    }
+
+    fun registerClient() {
+        ClientPlayNetworking.registerGlobalReceiver(KI_SYNC_ID) { client, _, buffer, _ ->
+            client.execute {
+                val localPlayer = MinecraftClient.getInstance().player ?: return@execute
+                val data = KiManager.getPlayerKiData(localPlayer)
+                KiSyncPayload.read(buffer, data)
+            }
+        }
+    }
+
+    fun syncPlayerKiToClient(player: ServerPlayerEntity, data: PlayerKiData) {
+        val buffer = PacketByteBufs.create()
+        KiSyncPayload.write(buffer, data)
+        ServerPlayNetworking.send(player, KI_SYNC_ID, buffer)
+    }
+
+    fun write(buffer: PacketByteBuf, data: PlayerKiData) {
+        buffer.writeFloat(data.currentKi)
+        buffer.writeFloat(data.maxKi)
+        buffer.writeFloat(data.currentStamina)
+        buffer.writeFloat(data.maxStamina)
+        buffer.writeFloat(data.kiControl)
+        buffer.writeFloat(data.kiPower)
+        buffer.writeFloat(data.kiDefense)
+        buffer.writeFloat(data.kiRegenRate)
+        buffer.writeFloat(data.kiDrainRate)
+        buffer.writeFloat(data.staminaRegenRate)
+        buffer.writeString(data.race.name)
+        buffer.writeString(data.transformationState.name)
+        buffer.writeString(data.currentKiState.name)
+        buffer.writeBoolean(data.isChargingKi)
+        buffer.writeFloat(data.chargeProgress)
+        buffer.writeBoolean(data.auraActive)
+        buffer.writeFloat(data.auraIntensity)
+        buffer.writeInt(data.damageNerfTicks)
+        buffer.writeLong(data.lastAttackTime)
+        buffer.writeInt(data.consecutiveActionsCount)
+    }
+
+    fun read(buffer: PacketByteBuf, data: PlayerKiData) {
+        data.currentKi = buffer.readFloat()
+        data.maxKi = buffer.readFloat()
+        data.currentStamina = buffer.readFloat()
+        data.maxStamina = buffer.readFloat()
+        data.kiControl = buffer.readFloat()
+        data.kiPower = buffer.readFloat()
+        data.kiDefense = buffer.readFloat()
+        data.kiRegenRate = buffer.readFloat()
+        data.kiDrainRate = buffer.readFloat()
+        data.staminaRegenRate = buffer.readFloat()
+        data.race = com.bernardo.dragoncraft.core.data.RaceType.valueOf(buffer.readString(32767))
+        data.transformationState = com.bernardo.dragoncraft.core.data.TransformationState.valueOf(buffer.readString(32767))
+        data.currentKiState = com.bernardo.dragoncraft.core.data.KiState.valueOf(buffer.readString(32767))
+        data.isChargingKi = buffer.readBoolean()
+        data.chargeProgress = buffer.readFloat()
+        data.auraActive = buffer.readBoolean()
+        data.auraIntensity = buffer.readFloat()
+        data.damageNerfTicks = buffer.readInt()
+        data.lastAttackTime = buffer.readLong()
+        data.consecutiveActionsCount = buffer.readInt()
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/network/KiSyncPayload.kt
+========================================
+package com.bernardo.dragoncraft.core.network
+
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import net.minecraft.network.PacketByteBuf
+
+object KiSyncPayload {
+
+    fun write(buffer: PacketByteBuf, data: PlayerKiData) {
+        buffer.writeFloat(data.currentKi)
+        buffer.writeFloat(data.maxKi)
+        buffer.writeFloat(data.currentStamina)
+        buffer.writeFloat(data.maxStamina)
+        buffer.writeFloat(data.kiControl)
+        buffer.writeFloat(data.kiPower)
+        buffer.writeFloat(data.kiDefense)
+        buffer.writeFloat(data.kiRegenRate)
+        buffer.writeFloat(data.kiDrainRate)
+        buffer.writeFloat(data.staminaRegenRate)
+        buffer.writeString(data.race.name)
+        buffer.writeString(data.transformationState.name)
+        buffer.writeString(data.currentKiState.name)
+        buffer.writeBoolean(data.isChargingKi)
+        buffer.writeFloat(data.chargeProgress)
+        buffer.writeBoolean(data.auraActive)
+        buffer.writeFloat(data.auraIntensity)
+        buffer.writeInt(data.damageNerfTicks)
+        buffer.writeLong(data.lastAttackTime)
+        buffer.writeInt(data.consecutiveActionsCount)
+    }
+
+    fun read(buffer: PacketByteBuf, data: PlayerKiData) {
+        data.currentKi = buffer.readFloat()
+        data.maxKi = buffer.readFloat()
+        data.currentStamina = buffer.readFloat()
+        data.maxStamina = buffer.readFloat()
+        data.kiControl = buffer.readFloat()
+        data.kiPower = buffer.readFloat()
+        data.kiDefense = buffer.readFloat()
+        data.kiRegenRate = buffer.readFloat()
+        data.kiDrainRate = buffer.readFloat()
+        data.staminaRegenRate = buffer.readFloat()
+        data.race = com.bernardo.dragoncraft.core.data.RaceType.valueOf(buffer.readString(32767))
+        data.transformationState = com.bernardo.dragoncraft.core.data.TransformationState.valueOf(buffer.readString(32767))
+        data.currentKiState = com.bernardo.dragoncraft.core.data.KiState.valueOf(buffer.readString(32767))
+        data.isChargingKi = buffer.readBoolean()
+        data.chargeProgress = buffer.readFloat()
+        data.auraActive = buffer.readBoolean()
+        data.auraIntensity = buffer.readFloat()
+        data.damageNerfTicks = buffer.readInt()
+        data.lastAttackTime = buffer.readLong()
+        data.consecutiveActionsCount = buffer.readInt()
+    }
+}
+
+
+========================================
+ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/core/transformation/TransformationManager.kt
+========================================
+package com.bernardo.dragoncraft.core.transformation
+
+import com.bernardo.dragoncraft.core.data.PlayerKiData
+import com.bernardo.dragoncraft.core.data.TransformationState
+import com.bernardo.dragoncraft.core.mechanics.KiDrain
+
+/**
+ * Gerenciador de Transformações.
+ * 
+ * Permite ativar/desativar transformações com validações de Ki.
+ * Suporta transições entre formas.
+ * Implementação é genérica e expansível para novas transformações.
+ */
+object TransformationManager {
+    
+    /**
+     * Tenta ativar uma transformação
+     * @return true se conseguiu, false caso contrário
+     */
+    fun activateTransformation(data: PlayerKiData, newTransformation: TransformationState): Boolean {
+        // Não pode transformar se já está transformado
+        if (data.transformationState.isActive() && data.transformationState != newTransformation) {
+            // Sim, pode fazer transição (ex: POWER_UP -> SUPER_FORM)
+            return transitionTransformation(data, newTransformation)
+        }
+        
+        if (data.transformationState == newTransformation) {
+            return true  // Já está nessa forma
+        }
+        
+        // Validar Ki suficiente
+        val requiredKi = getKiRequirement(newTransformation)
+        if (data.currentKi < requiredKi) {
+            return false
+        }
+        
+        // Consome Ki inicial
+        data.currentKi -= requiredKi
+        
+        // Ativa transformação
+        data.transformationState = newTransformation
+        return true
+    }
+    
+    /**
+     * Desativa transformação (volta ao normal)
+     */
+    fun deactivateTransformation(data: PlayerKiData): Boolean {
+        if (data.transformationState == TransformationState.NONE) {
+            return false  // Já não está transformado
+        }
+        
+        data.transformationState = TransformationState.NONE
+        return true
+    }
+    
+    /**
+     * Faz transição entre transformações (ex: Power Up -> Super Form)
+     */
+    private fun transitionTransformation(data: PlayerKiData, newTransformation: TransformationState): Boolean {
+        // Se pode descer (Ex: SUPER_FORM -> POWER_UP, sempre permite)
+        val previousForm = TransformationState.getPreviousTransformation(data.transformationState)
+        if (newTransformation == previousForm) {
+            data.transformationState = newTransformation
+            return true
+        }
+        
+        // Se pode subir (Ex: POWER_UP -> SUPER_FORM, precisa de Ki)
+        val nextForm = TransformationState.getNextTransformation(data.transformationState)
+        if (newTransformation == nextForm) {
+            val requiredKi = getKiRequirement(newTransformation)
+            if (data.currentKi >= requiredKi) {
+                data.currentKi -= requiredKi
+                data.transformationState = newTransformation
+                return true
+            }
+            return false
+        }
+        
+        return false
+    }
+    
+    /**
+     * Retorna quanto Ki é necessário para ativar transformação
+     */
+    fun getKiRequirement(transformation: TransformationState): Float {
+        return when (transformation) {
+            TransformationState.NONE -> 0f
+            TransformationState.POWER_UP -> 25f
+            TransformationState.SUPER_FORM -> 50f
+            TransformationState.ULTIMATE_POWER -> 100f
+        }
+    }
+    
+    /**
+     * Verifica se pode ativar uma transformação
+     */
+    fun canActivate(data: PlayerKiData, transformation: TransformationState): Boolean {
+        val required = getKiRequirement(transformation)
+        return data.currentKi >= required
+    }
+    
+    /**
+     * Processa cada tick enquanto transformado
+     * (drain contínuo, verificações, etc)
+     */
+    fun updateTransformation(data: PlayerKiData, currentTick: Long) {
+        if (!data.transformationState.isActive()) return
+        
+        // Drena Ki continuamente
+        KiDrain.drainTransformation(data)
+        
+        // Se ficou sem Ki enquanto transformado, deactivar
+        if (data.currentKi <= 0f) {
+            deactivateTransformation(data)
+        }
+    }
+    
+    /**
+     * Retorna descrição da transformação para HUD/debug
+     */
+    fun getTransformationInfo(transformation: TransformationState): String {
+        return buildString {
+            append(transformation.displayName)
+            append(" | Poder: x${transformation.powerMultiplier}")
+            append(" | Velocidade: x${transformation.speedMultiplier}")
+            append(" | Drain: x${transformation.drainMultiplier}")
+        }
+    }
+}
 
 
 ========================================
@@ -154,7 +2317,7 @@ package com.bernardo.dragoncraft.init
 import com.bernardo.dragoncraft.DragonCraftZ
 import com.bernardo.dragoncraft.block.*
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents
-import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings
+import net.minecraft.block.AbstractBlock
 import net.minecraft.block.Block
 import net.minecraft.block.Blocks
 import net.minecraft.item.BlockItem
@@ -165,20 +2328,18 @@ import net.minecraft.util.Identifier
 
 object ModBlocks {
 
-    val DIRTYSTONE_COBBLESTONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.COBBLESTONE))
-    val DIRTYSTONE_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
-    val DIRTYSTONE_STONE = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.STONE))
-
-    val NAMEK_GRASS = NamekGrassBlock(FabricBlockSettings.copyOf(Blocks.GRASS_BLOCK))
-    val NAMEK_DIRTY = DirtystoneBlock(FabricBlockSettings.copyOf(Blocks.DIRT))
-    val NAMEK_LOG = NamekLogBlock(FabricBlockSettings.copyOf(Blocks.OAK_LOG))
-    val NAMEK_LEAVES = NamekLeavesBlock(FabricBlockSettings.copyOf(Blocks.OAK_LEAVES))
-    val NAMEK_SAPLING = NamekSaplingBlock(FabricBlockSettings.copyOf(Blocks.OAK_SAPLING))
-
-    val LOOKOUT_FLOOR_RED = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_FLOOR_WHITE = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_WALL = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
-    val LOOKOUT_YELLOW_BLOCK = LookoutBlock(FabricBlockSettings.copyOf(Blocks.STONE_BRICKS))
+    val DIRTYSTONE_COBBLESTONE = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.COBBLESTONE))
+    val DIRTYSTONE_DIRTY = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.DIRT))
+    val DIRTYSTONE_STONE = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.STONE))
+    val NAMEK_GRASS = NamekGrassBlock(AbstractBlock.Settings.copy(Blocks.GRASS_BLOCK))
+    val NAMEK_DIRTY = DirtystoneBlock(AbstractBlock.Settings.copy(Blocks.DIRT))
+    val NAMEK_LOG = NamekLogBlock(AbstractBlock.Settings.copy(Blocks.OAK_LOG))
+    val NAMEK_LEAVES = NamekLeavesBlock(AbstractBlock.Settings.copy(Blocks.OAK_LEAVES))
+    val NAMEK_SAPLING = NamekSaplingBlock(AbstractBlock.Settings.copy(Blocks.OAK_SAPLING))
+    val LOOKOUT_FLOOR_RED = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_FLOOR_WHITE = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_WALL = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
+    val LOOKOUT_YELLOW_BLOCK = LookoutBlock(AbstractBlock.Settings.copy(Blocks.STONE_BRICKS))
 
     fun register() {
         registerBlock("dirtystone_cobblestone", DIRTYSTONE_COBBLESTONE)
@@ -414,6 +2575,7 @@ class SenzuBeanItem : DragonCraftFoodItem(
                 .hunger(20)
                 .saturationModifier(2.0f)
                 .alwaysEdible()
+                .snack() // Comer rápido
                 .build()
         )
         .maxCount(16)
@@ -424,17 +2586,26 @@ class SenzuBeanItem : DragonCraftFoodItem(
     }
 
     override fun getMaxUseTime(stack: ItemStack): Int {
-        return 32
+        return 16 // Comer mais rápido
     }
 
     override fun use(world: World, user: PlayerEntity, hand: Hand): TypedActionResult<ItemStack> {
-        return TypedActionResult.consume(user.getStackInHand(hand))
+        val stack = user.getStackInHand(hand)
+        
+        if (user.canConsume(false)) {
+            user.setCurrentHand(hand) // IMPORTANTE: Define a mão ativa
+            return TypedActionResult.consume(stack)
+        }
+        
+        return TypedActionResult.fail(stack)
     }
 
     override fun onFoodEaten(stack: ItemStack, world: World, user: LivingEntity) {
         if (!world.isClient && user is PlayerEntity) {
             user.health = user.maxHealth
             user.clearStatusEffects()
+            user.hungerManager.foodLevel = 20
+            user.hungerManager.saturationLevel = 20.0f
         }
     }
 
@@ -446,15 +2617,9 @@ class SenzuBeanItem : DragonCraftFoodItem(
     ) {
         tooltip.add(Text.literal("§aRestores full health and hunger"))
         tooltip.add(Text.literal("§7Clears all status effects"))
+        tooltip.add(Text.literal("§6Sacred bean from Korin Tower"))
     }
 }
-
-
-========================================
-ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/network/ModNetwork.kt
-========================================
-package com.bernardo.dragoncraft.network
-object ModNetwork { fun register() {} }
 
 
 ========================================
@@ -907,145 +3072,346 @@ ARQUIVO: src/main/resources/assets/dragoncraft/animations/dino1.animation.walk.j
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_cobblestone.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/dirtystone_cobblestone"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/dirtystone_cobblestone"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_dirty.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/dirtystone_dirty"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/dirtystone_dirty"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/dirtystone_stone.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/dirtystone_stone"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/dirtystone_stone"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_floor_red.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/lookout_floor_red"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/lookout_floor_red"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_floor_white.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/lookout_floor_white"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/lookout_floor_white"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_wall.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/lookout_wall"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/lookout_wall"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/lookout_yellow_block.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/lookout_yellow_block"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/lookout_yellow_block"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_dirty.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/namek_dirty"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/namek_dirty"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_grass.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/namek_grass"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/namek_grass"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_leaves.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/namek_leaves"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/namek_leaves"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_log.json
 ========================================
-{"variants":{"axis=y":{"model":"dragoncraft:block/namek_log"},"axis=x":{"model":"dragoncraft:block/namek_log","x":90,"y":90},"axis=z":{"model":"dragoncraft:block/namek_log","x":90}}}
+{
+  "variants": {
+    "axis=x": {
+      "model": "dragoncraft:block/namek_log_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "dragoncraft:block/namek_log"
+    },
+    "axis=z": {
+      "model": "dragoncraft:block/namek_log_horizontal",
+      "x": 90
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/blockstates/namek_sapling.json
 ========================================
-{"variants":{"":{"model":"dragoncraft:block/namek_sapling"}}}
+{
+  "variants": {
+    "": {
+      "model": "dragoncraft:block/namek_sapling"
+    }
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_cobblestone.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_cobblestone"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/dirtystone_cobblestone"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_dirty.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_dirty"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/dirtystone_dirty"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/dirtystone_stone.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/dirtystone_stone"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/dirtystone_stone"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_floor_red.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_floor_red"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/lookout_floor_red"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_floor_white.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_floor_white"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/lookout_floor_white"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_wall.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_wall"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/lookout_wall"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/lookout_yellow_block.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/lookout_yellow_block"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/lookout_yellow_block"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_dirty.json
 ========================================
-{"parent":"minecraft:block/cube_all","textures":{"all":"dragoncraft:block/namek_dirty"}}
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "dragoncraft:block/namek_dirty"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_grass.json
 ========================================
-{"parent":"minecraft:block/grass_block","textures":{"bottom":"dragoncraft:block/namek_dirty","top":"dragoncraft:block/namek_grass_top","side":"dragoncraft:block/namek_grass_side"}}
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "dragoncraft:block/namek_grass_top",
+    "bottom": "dragoncraft:block/namek_dirty",
+    "top": "dragoncraft:block/namek_grass_top",
+    "side": "dragoncraft:block/namek_grass_side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down":  {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "down"},
+        "up":    {"uv": [0, 0, 16, 16], "texture": "#top",    "cullface": "up"},
+        "north": {"uv": [0, 0, 16, 16], "texture": "#side",   "cullface": "north"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#side",   "cullface": "south"},
+        "west":  {"uv": [0, 0, 16, 16], "texture": "#side",   "cullface": "west"},
+        "east":  {"uv": [0, 0, 16, 16], "texture": "#side",   "cullface": "east"}
+      }
+    }
+  ]
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_leaves.json
 ========================================
-{"parent":"minecraft:block/leaves","textures":{"all":"dragoncraft:block/namek_leave"}}
+{
+  "parent": "minecraft:block/leaves",
+  "textures": {
+    "all": "dragoncraft:block/namek_leave"
+  }
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_log.json
 ========================================
-{"parent":"minecraft:block/cube_column","textures":{"end":"dragoncraft:block/namek_log_top","side":"dragoncraft:block/namek_log_side"}}
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "dragoncraft:block/namek_log_side",
+    "end": "dragoncraft:block/namek_log_top",
+    "side": "dragoncraft:block/namek_log_side"
+  },
+  "elements": [
+    {
+      "from": [6, 0, 6],
+      "to": [10, 16, 10],
+      "faces": {
+        "down":  {"uv": [6, 6, 10, 10], "texture": "#end", "cullface": "down"},
+        "up":    {"uv": [6, 6, 10, 10], "texture": "#end", "cullface": "up"},
+        "north": {"uv": [6, 0, 10, 16], "texture": "#side"},
+        "south": {"uv": [6, 0, 10, 16], "texture": "#side"},
+        "west":  {"uv": [6, 0, 10, 16], "texture": "#side"},
+        "east":  {"uv": [6, 0, 10, 16], "texture": "#side"}
+      }
+    }
+  ]
+}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_log_horizontal.json
+========================================
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "dragoncraft:block/namek_log_side",
+    "end": "dragoncraft:block/namek_log_top",
+    "side": "dragoncraft:block/namek_log_side"
+  },
+  "elements": [
+    {
+      "from": [0, 6, 6],
+      "to": [16, 10, 10],
+      "faces": {
+        "down":  {"uv": [0, 6, 16, 10], "texture": "#side"},
+        "up":    {"uv": [0, 6, 16, 10], "texture": "#side"},
+        "north": {"uv": [0, 6, 16, 10], "texture": "#side"},
+        "south": {"uv": [0, 6, 16, 10], "texture": "#side"},
+        "west":  {"uv": [6, 6, 10, 10], "texture": "#end", "cullface": "west"},
+        "east":  {"uv": [6, 6, 10, 10], "texture": "#end", "cullface": "east"}
+      }
+    }
+  ]
+}
 
 
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/block/namek_sapling.json
 ========================================
-{"parent":"minecraft:block/cross","textures":{"cross":"dragoncraft:block/namek_sapling"}}
+{
+  "parent": "minecraft:block/cross",
+  "textures": {
+    "cross": "dragoncraft:block/namek_sapling"
+  }
+}
 
 
 ========================================
@@ -1436,7 +3802,9 @@ ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_leaves.json
 ========================================
 ARQUIVO: src/main/resources/assets/dragoncraft/models/item/namek_log.json
 ========================================
-{"parent":"dragoncraft:block/namek_log"}
+{
+  "parent": "dragoncraft:block/namek_log"
+}
 
 
 ========================================
@@ -1455,6 +3823,84 @@ ARQUIVO: src/main/resources/assets/dragoncraft/models/item/senzu1.json
 ARQUIVO: src/main/resources/assets/dragoncraft/models/item/senzu2.json
 ========================================
 {"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/senzu2"}}
+
+
+========================================
+ARQUIVO: src/main/resources/assets/dragoncraft/models/item/senzu_bean.json
+========================================
+{"parent":"minecraft:item/generated","textures":{"layer0":"dragoncraft:item/senzu1"}}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/dirtystone_cobblestone.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:dirtystone_cobblestone"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/dirtystone_dirty.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:dirtystone_dirty"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/dirtystone_stone.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:dirtystone_stone"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/lookout_floor_red.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:lookout_floor_red"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/lookout_floor_white.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:lookout_floor_white"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/lookout_wall.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:lookout_wall"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/lookout_yellow_block.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:lookout_yellow_block"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/namek_dirty.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:namek_dirty"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/namek_grass.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:namek_grass"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/namek_leaves.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:namek_leaves"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/namek_log.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:namek_log"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
+
+
+========================================
+ARQUIVO: src/main/resources/data/dragoncraft/loot_tables/blocks/namek_sapling.json
+========================================
+{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"dragoncraft:namek_sapling"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}
 
 
 ========================================
@@ -1489,8 +3935,18 @@ ARQUIVO: src/main/resources/fabric.mod.json
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
-    "main": ["com.bernardo.dragoncraft.DragonCraftZ"],
-    "client": ["com.bernardo.dragoncraft.DragonCraftZClient"]
+    "main": [
+      {
+        "adapter": "kotlin",
+        "value": "com.bernardo.dragoncraft.DragonCraftZ"
+      }
+    ],
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "com.bernardo.dragoncraft.DragonCraftZClient"
+      }
+    ]
   },
   "mixins": ["dragoncraft.mixins.json"],
   "depends": {

@@ -1,0 +1,52 @@
+# Build e Gradle
+build/
+.gradle/
+bin/
+out/
+
+# Kotlin e Java
+.kotlin/
+*.kotlin_module
+*.class
+*.pyc
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - VS Code
+.vscode/
+
+# --- ESPECÍFICO MINECRAFT & FABRIC ---
+# Pastas de execução de teste
+run/
+run-client/
+run-server/
+run-datagen/
+
+# Dados gerados pelo jogo
+saves/
+logs/
+screenshots/
+resourcepacks/
+shaderpacks/
+mods/
+config/
+defaultconfigs/
+
+# Arquivos de configuração e cache do cliente
+options.txt
+optionsof.txt
+usercache.json
+usernamecache.json
+launcher_profiles.json
+hotbar.nbt
+realms_persistence.json
+
+# --- SISTEMA E SEGURANÇA ---
+local.properties
+.env
+.DS_Store
+Thumbs.db
