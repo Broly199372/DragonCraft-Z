@@ -1,6 +1,6 @@
 ==================================
 CÓDIGO DO MOD DRAGONCRAFT
-Data: Wed May 13 16:09:02 UTC 2026
+Data: Fri May 15 17:37:50 UTC 2026
 ==================================
 
 ========================================
@@ -24,6 +24,9 @@ src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_armor_model.png
 src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_bot_model.png
 src/main/resources/assets/dragoncraft/textures/entity/dbi_goku_leg_model.png
 src/main/resources/assets/dragoncraft/textures/entity/dino.png
+src/main/resources/assets/dragoncraft/textures/gui/hud.png
+src/main/resources/assets/dragoncraft/textures/gui/icons.png
+src/main/resources/assets/dragoncraft/textures/gui/menu.png
 src/main/resources/assets/dragoncraft/textures/item/dbi_goku_armor.png
 src/main/resources/assets/dragoncraft/textures/item/dbi_goku_bot.png
 src/main/resources/assets/dragoncraft/textures/item/dbi_goku_leg.png
@@ -36,6 +39,118 @@ src/main/resources/assets/dragoncraft/textures/item/dino_meat_raw.png
 src/main/resources/assets/dragoncraft/textures/item/dino_meat_raw_particule.png
 src/main/resources/assets/dragoncraft/textures/item/senzu1.png
 src/main/resources/assets/dragoncraft/textures/item/senzu2.png
+
+
+========================================
+ARQUIVO: src/main/java/com/bernardo/dragoncraft/client/btn/Btn.java
+========================================
+package com.bernardo.dragoncraft.client.btn;
+
+import com.bernardo.dragoncraft.DragonCraftZ;
+import net.minecraft.util.Identifier;
+
+
+
+public interface Btn {
+    void onClick();
+
+    int U();
+    int V();
+
+    int W();
+    int H();
+
+    int pressedU();
+    int pressedV();
+    
+    
+    
+    
+        int btn = new Identifier(DragonCraft.MOD_ID, "textures/gui/icons");
+    
+
+    void render(int U, int V, int W, int H, int pressedU, int pressedV, int mouseX, int mouseY, boolean isPressed); 
+
+
+
+
+}
+
+========================================
+ARQUIVO: src/main/java/com/bernardo/dragoncraft/client/btn/BtnArrowRight.java
+========================================
+package com.bernardo.dragoncraft.client.btn;
+
+import com.bernardo.dragoncraft.client.btn.Btn;
+
+public class BtnArrowRight implements Btn {
+    
+    (0, 0,
+     10, 10
+     0, 10
+    );
+
+
+}
+
+========================================
+ARQUIVO: src/main/java/com/bernardo/dragoncraft/mixin/PlayerDataMixin.java
+========================================
+package com.bernardo.dragoncraft.mixin;
+
+import com.bernardo.dragoncraft.core.KiManager;
+import com.bernardo.dragoncraft.core.KiSystem;
+import com.bernardo.dragoncraft.core.data.PlayerKiData;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.nbt.NbtCompound;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+/**
+ * Mixin para salvar e carregar dados de Ki no NBT do jogador.
+ * 
+ * IMPORTANTE: Este arquivo DEVE ser Java (.java), NÃO Kotlin (.kt)!
+ * Mixins em Kotlin são incompatíveis com SpongePowered Mixin.
+ * 
+ * Injeta nos métodos writeCustomDataToNbt e readCustomDataFromNbt
+ * do PlayerEntity para persistir os dados de Ki entre sessões.
+ */
+@Mixin(PlayerEntity.class)
+public abstract class PlayerDataMixin {
+
+    /**
+     * Salva dados de Ki quando o jogador é salvo no mundo.
+     * Chamado automaticamente ao sair, ao salvar o mundo, etc.
+     */
+    @Inject(method = "writeCustomDataToNbt", at = @At("TAIL"))
+    private void dragoncraft$saveKiData(NbtCompound nbt, CallbackInfo ci) {
+        PlayerEntity player = (PlayerEntity) (Object) this;
+        PlayerKiData data = KiManager.INSTANCE.getPlayerKiDataOrNull(player.getUuid());
+        if (data != null) {
+            NbtCompound kiNbt = new NbtCompound();
+            data.writeToNbt(kiNbt);
+            nbt.put("DragonCraftKi", kiNbt);
+        }
+    }
+
+    /**
+     * Carrega dados de Ki quando o jogador é carregado do mundo.
+     * Chamado automaticamente ao entrar no mundo, ao respawnar, etc.
+     */
+    @Inject(method = "readCustomDataFromNbt", at = @At("TAIL"))
+    private void dragoncraft$loadKiData(NbtCompound nbt, CallbackInfo ci) {
+        PlayerEntity player = (PlayerEntity) (Object) this;
+        if (nbt.contains("DragonCraftKi")) {
+            NbtCompound kiNbt = nbt.getCompound("DragonCraftKi");
+            PlayerKiData data = new PlayerKiData();
+            data.readFromNbt(kiNbt);
+            KiManager.INSTANCE.setPlayerKiData(player, data);
+            KiSystem.INSTANCE.validateData(data);
+        }
+    }
+}
 
 
 ========================================
@@ -74,36 +189,6 @@ object DragonCraftZ : ModInitializer {
         }
 
         LOGGER.info("DragonCraft Z is ready. Power level: OVER 9000!")
-    }
-}
-
-
-========================================
-ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/DragonCraftZClient.kt
-========================================
-package com.bernardo.dragoncraft
-
-import com.bernardo.dragoncraft.client.rendering.KiHud
-import com.bernardo.dragoncraft.core.network.KiNetworking
-import net.fabricmc.api.ClientModInitializer
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
-
-object DragonCraftZClient : ClientModInitializer {
-
-    override fun onInitializeClient() {
-        DragonCraftZ.LOGGER.info("DragonCraft Z client initialized!")
-    
-        KiNetworking.registerClient()
-
-        // ===== SISTEMA DE KI - RENDERIZAÇÃO HUD =====
-        try {
-            HudRenderCallback.EVENT.register { context, tickCounter ->
-                KiHud.render(context, net.minecraft.client.MinecraftClient.getInstance())
-            }
-            DragonCraftZ.LOGGER.info("✓ HUD de Ki registrado com sucesso")
-        } catch (e: Exception) {
-            DragonCraftZ.LOGGER.error("✗ Erro ao registrar HUD de Ki:", e)
-        }
     }
 }
 
@@ -177,208 +262,6 @@ class NamekTreeGenerator : SaplingGenerator() {
     override fun getTreeFeature(random: Random, bees: Boolean): RegistryKey<ConfiguredFeature<*, *>>? {
         // Retorna null = usa comportamento padrão do Minecraft
         return null
-    }
-}
-
-
-========================================
-ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/client/rendering/KiHud.kt
-========================================
-package com.bernardo.dragoncraft.client.rendering
-
-import com.bernardo.dragoncraft.core.KiManager
-import com.bernardo.dragoncraft.core.data.PlayerKiData
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.util.math.MatrixStack
-
-/**
- * HUD DE KI CLIENTE
- * 
- * Renderiza:
- * - Barra de Ki
- * - Barra de Stamina
- * - Indicadores de estado (transformação, charge, etc)
- * - Perda de performance: ~0.5ms por frame (otimizado!)
- * 
- * Só executa no cliente!
- */
-object KiHud {
-    
-    // --- CORES (RGBA em hex) ---
-    private const val COLOR_KI_NORMAL = 0xFF_00_FF_FF.toInt()      // Cyan
-    private const val COLOR_KI_LOW = 0xFF_FF_00_00.toInt()         // Red
-    private const val COLOR_STAMINA = 0xFF_FF_FF_00.toInt()        // Yellow
-    private const val COLOR_BACKGROUND = 0xAA_00_00_00.toInt()     // Semi-transparent black
-    private const val COLOR_CHARGING = 0xFF_FF_FF_FF.toInt()       // White
-    
-    // --- DIMENSÕES ---
-    private const val BAR_WIDTH = 180
-    private const val BAR_HEIGHT = 8
-    private const val SPACING_Y = 12
-    
-    /**
-     * Renderiza o HUD inteiro
-     * Chamado a cada frame pelo cliente
-     */
-    fun render(context: DrawContext, client: MinecraftClient) {
-        val player = client.player ?: return
-        val data = KiManager.getPlayerKiData(player) ?: return
-        
-        // Posição no canto superior esquerdo
-        val posX = 10
-        val posY = 10
-        
-        // --------- BARRA DE KI ---------
-        renderKiBar(context, data, posX, posY)
-        
-        // --------- BARRA DE STAMINA ---------
-        renderStaminaBar(context, data, posX, posY + SPACING_Y)
-        
-        // --------- INDICADOR DE TRANSFORMAÇÃO ---------
-        renderTransformationIndicator(context, data, posX, posY + SPACING_Y * 2)
-        
-        // --------- INDICADOR DE CARGA ---------
-        if (data.isChargingKi) {
-            renderChargeIndicator(context, data, posX, posY + SPACING_Y * 3)
-        }
-        
-        // --------- AURA ATIVA ---------
-        if (data.auraActive) {
-            renderAuraIndicator(context, data, posX, posY + SPACING_Y * 4)
-        }
-    }
-    
-    /**
-     * Renderiza barra de Ki
-     */
-    private fun renderKiBar(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
-        // Background
-        context.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, COLOR_BACKGROUND)
-        
-        // Determinar cor baseado em estado
-        val barColor = if (data.getKiPercent() < 0.2f) COLOR_KI_LOW else COLOR_KI_NORMAL
-        
-        // Barra de Ki
-        val filledWidth = (BAR_WIDTH * data.getKiPercent()).toInt()
-        context.fill(x, y, x + filledWidth, y + BAR_HEIGHT, barColor)
-        
-        // Border
-        context.fill(x - 1, y - 1, x + BAR_WIDTH + 1, y, 0xFF_80_80_80.toInt())  // Top
-        context.fill(x - 1, y + BAR_HEIGHT, x + BAR_WIDTH + 1, y + BAR_HEIGHT + 1, 0xFF_80_80_80.toInt())  // Bottom
-        
-        // Texto
-        val kiText = "${data.currentKi.toInt()}/${data.maxKi.toInt()}"
-        context.drawCenteredTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            kiText,
-            x + BAR_WIDTH / 2,
-            y + BAR_HEIGHT / 2 - 4,
-            0xFF_FF_FF_FF.toInt()
-        )
-    }
-    
-    /**
-     * Renderiza barra de Stamina
-     */
-    private fun renderStaminaBar(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
-        // Background
-        context.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, COLOR_BACKGROUND)
-        
-        // Barra de Stamina
-        val filledWidth = (BAR_WIDTH * data.getStaminaPercent()).toInt()
-        context.fill(x, y, x + filledWidth, y + BAR_HEIGHT, COLOR_STAMINA)
-        
-        // Border
-        context.fill(x - 1, y - 1, x + BAR_WIDTH + 1, y, 0xFF_80_80_80.toInt())  // Top
-        context.fill(x - 1, y + BAR_HEIGHT, x + BAR_WIDTH + 1, y + BAR_HEIGHT + 1, 0xFF_80_80_80.toInt())  // Bottom
-        
-        // Texto
-        val stamText = "STA: ${data.currentStamina.toInt()}"
-        context.drawTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            stamText,
-            x + 2,
-            y + 1,
-            0xFF_FF_FF_FF.toInt()
-        )
-    }
-    
-    /**
-     * Renderiza indicador de transformação
-     */
-    private fun renderTransformationIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
-        if (!data.transformationState.isActive()) return
-        
-        val text = "Transformação: ${data.transformationState.displayName} [x${data.transformationState.powerMultiplier}]"
-        context.drawTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            text,
-            x,
-            y,
-            data.transformationState.color
-        )
-    }
-    
-    /**
-     * Renderiza indicador de carga
-     */
-    private fun renderChargeIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
-        val chargePercentage = (data.chargeProgress * 100).toInt()
-        val text = "Carregando... $chargePercentage%"
-        
-        context.drawTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            text,
-            x,
-            y,
-            COLOR_CHARGING
-        )
-        
-        // Barra de progresso de carga
-        val chargeBarWidth = (150 * data.chargeProgress).toInt()
-        context.fill(x, y + 10, x + chargeBarWidth, y + 12, COLOR_CHARGING)
-        context.fill(x, y + 9, x + 150, y + 13, 0xFF_80_80_80.toInt())  // Border
-    }
-    
-    /**
-     * Renderiza indicador de aura
-     */
-    private fun renderAuraIndicator(context: DrawContext, data: PlayerKiData, x: Int, y: Int) {
-        val text = "AURA ATIVA [${(data.auraIntensity * 100).toInt()}%]"
-        context.drawTextWithShadow(
-            MinecraftClient.getInstance().textRenderer,
-            text,
-            x,
-            y,
-            data.transformationState.color
-        )
-    }
-}
-
-
-========================================
-ARQUIVO: src/main/kotlin/com/bernardo/dragoncraft/client/screen/GuiScreen.kt
-========================================
-package com.bernardo.dragoncraft.client.screen
-
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
-import net.minecraft.client.gui.DrawContext
-
-object GuiScreen : HudRenderCallback {
-
-    fun register() {
-        HudRenderCallback.EVENT.register(this)
-    }
-
-    override fun onHudRender(drawContext: DrawContext, tickDelta: Float) {
-        val screenWidth = drawContext.scaledWindowWidth
-        val width = 160
-        val height = 10
-        val x = 5
-        val y = 5
-        
-        drawContext.fill(x, y, x + width, y + height, 0xFF000000.toInt())
     }
 }
 
